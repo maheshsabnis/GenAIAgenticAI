@@ -1,0 +1,2198 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name=claude:viewport-fit-sides content=cover><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>.md-table{overflow-x:auto}@media print{.md-table{overflow-x:visible}}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>Generative AI and Agentic AI: Trainer's Tutorial (C# and Python)</h1>
+<p>This guide is written for a trainer. <strong>New to all of this? Start with Part 0</strong>, which explains everything from zero in plain words before any heavy code. Each topic has a plain definition, the reason it exists, a point-by-point explanation, working code in Python and C#, and a short <strong>Trainer tip</strong> you can use while teaching.</p>
+<p><strong>Draft notice:</strong> Library APIs in this space change quickly. The code below uses the stable, lower-level layers (the <code>openai</code> Python SDK and Microsoft.Extensions.AI for C#) so it should survive version changes. Microsoft Agent Framework is covered conceptually. Check exact method names against current docs before class.</p>
+<hr>
+<h2>Contents</h2>
+<ol>
+<li>Setup and prerequisites (then <strong>Part 0: Start here</strong>, the beginner foundations)</li>
+<li>Part 1: Generative AI</li>
+<li>Part 2: RAG (Retrieval-Augmented Generation)</li>
+<li>Part 3: Agentic AI and building agents</li>
+<li>Part 4: Event-based agents</li>
+<li>Part 5: Multi-agent systems</li>
+<li>Framework landscape (what to use in 2026)</li>
+<li>Production concerns: security, evaluation, observability, cost</li>
+<li>Common mistakes</li>
+<li>Suggested training plan, labs and quiz</li>
+<li>Glossary</li>
+</ol>
+<hr>
+<h2>1. Setup and prerequisites</h2>
+<p><strong>Python (3.10+)</strong></p>
+<pre><code class="language-bash">pip install openai numpy python-dotenv
+export OPENAI_API_KEY=&#34;your-key&#34;
+</code></pre>
+<p><strong>C# (.NET 8 or later)</strong></p>
+<pre><code class="language-bash">dotnet new console -n GenAiDemo
+cd GenAiDemo
+dotnet add package Microsoft.Extensions.AI
+dotnet add package Microsoft.Extensions.AI.OpenAI
+dotnet add package System.Numerics.Tensors
+</code></pre>
+<p>The examples use an OpenAI-compatible endpoint and the model name <code>gpt-4o-mini</code>. You can swap in Azure OpenAI, Claude (through its own SDK), or a local model without changing the concepts. Only the client creation line changes.</p>
+<p><strong>Trainer tip:</strong> Put the API key in an environment variable before class and never type it on screen. It is the most common accidental leak in workshops.</p>
+<hr>
+<h1>Part 0: Start Here (Beginner Foundations)</h1>
+<p>If you are new to AI, read this part first. It is mostly plain explanation, with code only at the end. Every later part builds on these ideas.</p>
+<h2>0.1 How AI evolved</h2>
+<pre><code>Traditional AI  →  Machine Learning  →  Deep Learning  →  Generative AI  →  Agentic AI
+</code></pre>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What it does</th>
+<th>Simple example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Traditional AI</td>
+<td>Follows rules written by people</td>
+<td>&quot;If the order total is over 500, flag it for review&quot;</td>
+</tr>
+<tr>
+<td>Machine Learning</td>
+<td>Learns patterns from data instead of fixed rules</td>
+<td>A spam filter trained on thousands of emails</td>
+</tr>
+<tr>
+<td>Deep Learning</td>
+<td>Machine learning using large neural networks. Strong at images, speech, and language</td>
+<td>Face recognition, voice assistants</td>
+</tr>
+<tr>
+<td>Generative AI</td>
+<td>Creates new content: text, code, images</td>
+<td>ChatGPT writing a C# method</td>
+</tr>
+<tr>
+<td>Agentic AI</td>
+<td>Pursues a goal by reasoning, using tools, and taking actions</td>
+<td>An assistant that creates your Azure environment and deploys your app</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Each stage builds on the one before it. Agentic AI is not a brand new technology. It is a Gen AI model (an LLM) placed inside a loop and given tools.</p>
+<hr>
+<h2>0.2 What is Generative AI (Gen AI)?</h2>
+<p><strong>Generative AI is AI that creates new content instead of only analyzing existing data.</strong></p>
+<p>It can generate:</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Examples of tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text</td>
+<td>ChatGPT, Claude, Gemini</td>
+</tr>
+<tr>
+<td>Code</td>
+<td>GitHub Copilot</td>
+</tr>
+<tr>
+<td>Documents and chat help</td>
+<td>Microsoft Copilot</td>
+</tr>
+<tr>
+<td>Images</td>
+<td>DALL-E, Midjourney</td>
+</tr>
+<tr>
+<td>Audio and video</td>
+<td>Speech and video generation tools</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>How Gen AI works (in simple words)</h3>
+<p>Most text-based Gen AI runs on a <strong>Large Language Model (LLM)</strong>. Examples: GPT, Claude, Gemini, Llama.</p>
+<ol>
+<li>The model is trained on a huge amount of text and code.</li>
+<li>During training it learns patterns of language: which words and ideas tend to follow which.</li>
+<li>When you give it a prompt, it predicts the most likely next piece of text, then the next, and so on, until it has written a full answer.</li>
+</ol>
+<p>It is not looking up a stored answer. It is generating a new one each time, which is why the same question can produce slightly different wording.</p>
+<h3>Example</h3>
+<p><strong>Prompt</strong></p>
+<pre><code>Write a C# method to reverse a string.
+</code></pre>
+<p><strong>Output</strong></p>
+<pre><code class="language-csharp">using System.Linq;
+
+public static string Reverse(string value)
+{
+    return new string(value.Reverse().ToArray());
+}
+</code></pre>
+<p>The AI produced code that did not exist in that exact form before. (Note the <code>using System.Linq;</code> line. <code>Reverse()</code> on a string comes from LINQ, and the model's snippet may leave it out. Always read and test generated code.)</p>
+<h3>Characteristics of Gen AI</h3>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generates content</td>
+<td>Creates text, code, images</td>
+</tr>
+<tr>
+<td>Prompt driven</td>
+<td>Needs your instructions to start</td>
+</tr>
+<tr>
+<td>Reactive</td>
+<td>Waits for your input, does not act on its own</td>
+</tr>
+<tr>
+<td>Context aware</td>
+<td>Uses the conversation so far (the history you send it)</td>
+</tr>
+<tr>
+<td>Creative</td>
+<td>Produces new wording and ideas</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>Real-life example</h3>
+<p>You ask: <em>&quot;Create a Kubernetes Deployment YAML file.&quot;</em></p>
+<p>The Gen AI understands the request, writes the YAML, returns it, and stops.</p>
+<pre><code>User  →  Prompt  →  LLM  →  Generated Response  →  (done)
+</code></pre>
+<h3>What Gen AI is good at, and where it stops</h3>
+<p>Good at:</p>
+<ol>
+<li>Answering questions</li>
+<li>Generating code</li>
+<li>Summarizing documents</li>
+<li>Explaining concepts</li>
+</ol>
+<p>On its own, a plain Gen AI model does not:</p>
+<ol>
+<li>Make decisions independently</li>
+<li>Run long multi-step workflows</li>
+<li>Use tools again and again on its own</li>
+<li>Take actions without being prompted</li>
+</ol>
+<p><strong>Beginner note:</strong> Products like ChatGPT and Copilot now add tools and agent features around the model, so the line between &quot;Gen AI&quot; and &quot;Agentic AI&quot; is blurry in real products. In this guide, &quot;Gen AI&quot; means the model answering a prompt, and &quot;Agentic AI&quot; means the model working in a loop with tools.</p>
+<hr>
+<h2>0.3 What is Agentic AI?</h2>
+<p><strong>Agentic AI goes beyond writing content. It works toward a goal.</strong></p>
+<p>An <strong>AI agent</strong> is a system that can:</p>
+<ol>
+<li>Understand a goal</li>
+<li>Plan the tasks needed</li>
+<li>Use tools</li>
+<li>Make decisions</li>
+<li>Execute actions</li>
+<li>Observe the results</li>
+<li>Retry or change approach if something fails</li>
+</ol>
+<p>A useful way to think about it: an agent behaves more like a digital employee than a chatbot.</p>
+<h3>The agent loop</h3>
+<pre><code>Goal
+  ↓
+Reason     (what should I do next?)
+  ↓
+Plan       (break the goal into steps)
+  ↓
+Act        (call a tool)
+  ↓
+Observe    (read the result)
+  ↓
+Adjust     (did it work? what now?)
+  ↓
+Complete the goal   (or loop back to Reason)
+</code></pre>
+<p>This is often called <strong>Reason, Act, Observe</strong>, or the <strong>ReAct pattern</strong>.</p>
+<h3>What one loop looks like in practice</h3>
+<p>Goal: <em>&quot;Create an AKS cluster.&quot;</em></p>
+<pre><code>Reason:  I need a resource group before a cluster. Let me check the subscription first.
+Act:     check_subscription()
+Observe: Subscription is enabled.
+Reason:  Now create the resource group.
+Act:     create_resource_group(&#34;rg-demo&#34;)
+Observe: Success.
+Reason:  Now create the cluster.
+Act:     create_aks_cluster(&#34;rg-demo&#34;, &#34;aks-demo&#34;)
+Observe: Error: quota exceeded.
+Adjust:  Try a smaller node size or tell the user the quota is the blocker.
+</code></pre>
+<p>The last two lines are what makes it an agent. It saw a failure and changed its behavior instead of stopping.</p>
+<h3>Gen AI vs Agentic AI: same request, two responses</h3>
+<p><strong>Generative AI.</strong> You ask: <em>&quot;Show me Azure AKS cluster creation steps.&quot;</em></p>
+<pre><code>1. Create Resource Group
+2. Create AKS Cluster
+3. Configure kubectl
+...
+</code></pre>
+<p>Done. You still have to do the work.</p>
+<p><strong>Agentic AI.</strong> You ask: <em>&quot;Create an AKS cluster and deploy my application.&quot;</em></p>
+<pre><code>Step 1: Check Azure Subscription
+Step 2: Create Resource Group
+Step 3: Create AKS Cluster
+Step 4: Build Docker Image
+Step 5: Push to ACR
+Step 6: Deploy to AKS
+Step 7: Verify Deployment
+Step 8: Report Result
+</code></pre>
+<p>The agent performs the multiple actions needed to reach the objective.</p>
+<h3>Traditional Copilot vs Agentic Copilot</h3>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Traditional Copilot</th>
+<th>Agentic Copilot</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>You: &quot;Generate a Dockerfile.&quot;</td>
+<td>You: &quot;Containerize my ASP.NET Core application.&quot;</td>
+</tr>
+<tr>
+<td>Copilot returns a Dockerfile.</td>
+<td>Agent: 1. Analyze the project. 2. Create the Dockerfile. 3. Build the image. 4. Run tests. 5. Push to the registry. 6. Create Kubernetes YAML. 7. Deploy.</td>
+</tr>
+<tr>
+<td>End of interaction.</td>
+<td>Goal achieved with minimal further input.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2>0.4 Core components of an AI agent</h2>
+<p>An agent has four main parts. Learn these four and every framework will make sense.</p>
+<h3>1. The LLM (the brain)</h3>
+<p>The model that does the thinking: it reads the situation, analyzes it, and decides what to do next. Examples: GPT, Claude, Gemini, Llama. A stronger model generally makes better decisions in the loop.</p>
+<h3>2. Memory</h3>
+<p>What the agent remembers.</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What it holds</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Short-term</td>
+<td>The current conversation and task</td>
+<td>&quot;User asked to deploy to AKS&quot;</td>
+</tr>
+<tr>
+<td>Long-term</td>
+<td>Facts stored outside the model and loaded when needed</td>
+<td>&quot;User prefers AKS and Azure DevOps&quot;</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Beginner note: the model itself remembers nothing between calls. &quot;Memory&quot; means your code saves information (in a database or vector store) and sends the relevant parts back with the next request.</p>
+<h3>3. Tools</h3>
+<p>Tools are how an agent touches the real world. Examples: Azure CLI, GitHub, a database, web search, email, PowerShell, a REST API.</p>
+<pre><code>LLM  →  asks to call Azure CLI  →  your code runs it  →  result returned to the LLM
+</code></pre>
+<p>The model does not run the tool. It asks, and your code runs it (explained in 3.4).</p>
+<h3>4. Planning</h3>
+<p>The ability to break a big goal into smaller tasks.</p>
+<p>Goal: <em>&quot;Create an Inventory API.&quot;</em></p>
+<pre><code>1. Create Entity
+2. Create DbContext
+3. Create Migration
+4. Create Repository
+5. Create Service
+6. Create API Controller
+7. Add Swagger
+8. Run Migration
+</code></pre>
+<p>Beginner note: in simple agents the model plans by itself through its instructions. Larger frameworks may add a separate planner component that tracks tasks and progress.</p>
+<h3>Agent architecture</h3>
+<pre><code>               ┌───────────┐
+               │   User    │
+               └─────┬─────┘
+                     │ goal
+                     ▼
+             ┌───────────────┐
+             │     Agent     │
+             └───────┬───────┘
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+     Memory       Planner        LLM
+        └────────────┼────────────┘
+                     ▼
+              Tool Invocation
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+    Azure CLI      GitHub      Database
+                     │
+                     ▼
+                  Result  (fed back to the agent, loop continues)
+</code></pre>
+<hr>
+<h2>0.5 Gen AI vs Agentic AI at a glance</h2>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Generative AI</th>
+<th>Agentic AI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generates content</td>
+<td>Yes</td>
+<td>Yes (it uses Gen AI inside)</td>
+</tr>
+<tr>
+<td>Answers questions</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Uses tools</td>
+<td>Limited</td>
+<td>Extensively</td>
+</tr>
+<tr>
+<td>Makes decisions</td>
+<td>Minimal</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Plans tasks</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Executes actions</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Multi-step workflows</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Limited (the conversation)</td>
+<td>Advanced (short and long term)</td>
+</tr>
+<tr>
+<td>Goal oriented</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Autonomous</td>
+<td>No</td>
+<td>Yes, within limits you set</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Key point:</strong> Agentic AI does not replace Gen AI. It is built on top of it. The LLM is the brain, and the agent is the brain plus memory, tools, and a loop.</p>
+<h3>Azure example</h3>
+<p><strong>Generative AI</strong></p>
+<pre><code>Prompt: Generate Azure Bicep for AKS.
+Output: A Bicep template.
+</code></pre>
+<p><strong>Agentic AI</strong></p>
+<pre><code>Goal: Create a production AKS environment.
+
+Agent:
+  Create VNET
+  Create AKS
+  Create ACR
+  Enable Monitoring
+  Create Dashboard
+  Configure Alerts
+  Deploy Application
+  Run Validation
+  Generate Report
+</code></pre>
+<h3>A simple analogy</h3>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th></th>
+<th>Generative AI = Smart Writer</th>
+<th>Agentic AI = Employee</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>You ask</td>
+<td>&quot;Write a report.&quot;</td>
+<td>&quot;Prepare the monthly sales report.&quot;</td>
+</tr>
+<tr>
+<td>What happens</td>
+<td>It writes the report.</td>
+<td>It collects the data, analyzes it, creates charts, writes the report, and emails stakeholders, without you giving each instruction separately.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>In one sentence</h3>
+<blockquote>
+<p>Generative AI creates content in response to prompts. Agentic AI pursues goals by reasoning, planning, using tools, taking actions, and adapting until the task is done.</p>
+</blockquote>
+<p>Or shorter: <strong>Gen AI = &quot;Answer my question.&quot; Agentic AI = &quot;Achieve my objective.&quot;</strong></p>
+<p><strong>Safety note for beginners:</strong> An agent that can create cloud resources or deploy code can also create costs or break things. Real agents need limits: scoped permissions, dry-run modes, approval steps for risky actions, and step limits. Part 8 covers this.</p>
+<hr>
+<h2>0.6 Where the tools you may have heard of fit (for .NET and Azure developers)</h2>
+<pre><code>ChatGPT / Copilot Chat
+        ↓
+  Generative AI
+
+Copilot agents, Azure AI agents, Semantic Kernel agents,
+AutoGen, CrewAI, LangGraph, Microsoft Agent Framework
+        ↓
+   Agentic AI
+</code></pre>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Name</th>
+<th>What it is</th>
+<th>Beginner explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ChatGPT, Copilot Chat</td>
+<td>Chat apps built on LLMs</td>
+<td>You ask, it answers.</td>
+</tr>
+<tr>
+<td>GitHub Copilot</td>
+<td>Code assistant, now with agent modes</td>
+<td>Suggests code, and in agent mode can edit files and run commands.</td>
+</tr>
+<tr>
+<td>Semantic Kernel</td>
+<td>Microsoft SDK for AI apps and agents (C#, Python)</td>
+<td>Older Microsoft framework, now succeeded by Agent Framework.</td>
+</tr>
+<tr>
+<td>AutoGen</td>
+<td>Microsoft multi-agent framework (Python)</td>
+<td>Also succeeded by Agent Framework.</td>
+</tr>
+<tr>
+<td>Microsoft Agent Framework</td>
+<td>Microsoft's combined agent framework (C#, Python)</td>
+<td>The current Microsoft choice for new agent projects. See Part 7.</td>
+</tr>
+<tr>
+<td>CrewAI</td>
+<td>Python multi-agent framework</td>
+<td>You define agents with roles and let a &quot;crew&quot; collaborate.</td>
+</tr>
+<tr>
+<td>LangGraph</td>
+<td>Python and TypeScript agent framework</td>
+<td>Models an agent as a graph of steps with state.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The industry trend you will hear described:</p>
+<pre><code>Prompt Engineering  →  RAG  →  AI Agents  →  Multi-Agent Systems
+</code></pre>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>In plain words</th>
+<th>Where in this guide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prompt engineering</td>
+<td>Learn to ask the model well</td>
+<td>Part 1</td>
+</tr>
+<tr>
+<td>RAG</td>
+<td>Give the model your own data to answer from</td>
+<td>Part 2</td>
+</tr>
+<tr>
+<td>AI agents</td>
+<td>Let the model use tools and work toward a goal</td>
+<td>Part 3 and Part 4</td>
+</tr>
+<tr>
+<td>Multi-agent systems</td>
+<td>Several specialized agents collaborate on a big workflow</td>
+<td>Part 5</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>That is also a good <strong>learning order</strong> if you are starting from zero. Do not jump to multi-agent before you are comfortable with a single prompt and a single tool call.</p>
+<hr>
+<h2>0.7 Hands-on: a simulated DevOps agent (your AKS example, made safe)</h2>
+<p>This demo turns the AKS scenario into code. <strong>Nothing real is created.</strong> The &quot;cloud&quot; is a few in-memory sets, so you can run it safely and watch the Reason, Act, Observe loop.</p>
+<p>The tools are:</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it pretends to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>check_subscription</code></td>
+<td>Confirms the Azure subscription is enabled</td>
+</tr>
+<tr>
+<td><code>create_resource_group</code></td>
+<td>Creates a resource group</td>
+</tr>
+<tr>
+<td><code>create_aks_cluster</code></td>
+<td>Creates a cluster (fails if the resource group is missing)</td>
+</tr>
+<tr>
+<td><code>deploy_app</code></td>
+<td>Deploys an image to the cluster (fails if the cluster is missing)</td>
+</tr>
+<tr>
+<td><code>verify_deployment</code></td>
+<td>Reports whether pods are running</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Notice that two tools return an <strong>error</strong> when called in the wrong order. That is deliberate. It lets you see the agent observe a failure and adjust.</p>
+<p><strong>Python</strong></p>
+<pre><code class="language-python">import json, os
+from openai import OpenAI
+
+client = OpenAI()
+MODEL = os.getenv(&#34;MODEL&#34;, &#34;gpt-4o-mini&#34;)
+
+# ---- Fake cloud state. Nothing real is created. ----
+cloud = {&#34;resource_groups&#34;: set(), &#34;clusters&#34;: set(), &#34;deployed&#34;: set()}
+
+def check_subscription() -&gt; dict:
+    return {&#34;subscription&#34;: &#34;demo-subscription&#34;, &#34;state&#34;: &#34;Enabled&#34;}
+
+def create_resource_group(name: str) -&gt; dict:
+    cloud[&#34;resource_groups&#34;].add(name)
+    return {&#34;ok&#34;: True, &#34;resource_group&#34;: name}
+
+def create_aks_cluster(resource_group: str, cluster_name: str) -&gt; dict:
+    if resource_group not in cloud[&#34;resource_groups&#34;]:
+        return {&#34;error&#34;: f&#34;Resource group &#39;{resource_group}&#39; does not exist. Create it first.&#34;}
+    cloud[&#34;clusters&#34;].add(cluster_name)
+    return {&#34;ok&#34;: True, &#34;cluster&#34;: cluster_name}
+
+def deploy_app(cluster_name: str, image: str) -&gt; dict:
+    if cluster_name not in cloud[&#34;clusters&#34;]:
+        return {&#34;error&#34;: f&#34;Cluster &#39;{cluster_name}&#39; does not exist. Create it first.&#34;}
+    cloud[&#34;deployed&#34;].add(image)
+    return {&#34;ok&#34;: True, &#34;deployed&#34;: image, &#34;cluster&#34;: cluster_name}
+
+def verify_deployment(cluster_name: str) -&gt; dict:
+    return {&#34;cluster&#34;: cluster_name, &#34;pods_running&#34;: 3 if cloud[&#34;deployed&#34;] else 0}
+
+REGISTRY = {f.__name__: f for f in [
+    check_subscription, create_resource_group, create_aks_cluster, deploy_app, verify_deployment
+]}
+
+# ---- Tell the model what tools exist (name, description, parameters) ----
+def tool(name, description, **params):
+    return {&#34;type&#34;: &#34;function&#34;, &#34;function&#34;: {
+        &#34;name&#34;: name,
+        &#34;description&#34;: description,
+        &#34;parameters&#34;: {
+            &#34;type&#34;: &#34;object&#34;,
+            &#34;properties&#34;: {p: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: d} for p, d in params.items()},
+            &#34;required&#34;: list(params),
+        },
+    }}
+
+TOOLS = [
+    tool(&#34;check_subscription&#34;, &#34;Check that the Azure subscription is enabled.&#34;),
+    tool(&#34;create_resource_group&#34;, &#34;Create an Azure resource group.&#34;, name=&#34;Resource group name&#34;),
+    tool(&#34;create_aks_cluster&#34;, &#34;Create an AKS cluster inside an existing resource group.&#34;,
+         resource_group=&#34;Existing resource group name&#34;, cluster_name=&#34;New cluster name&#34;),
+    tool(&#34;deploy_app&#34;, &#34;Deploy a container image to an existing AKS cluster.&#34;,
+         cluster_name=&#34;Existing cluster name&#34;, image=&#34;Container image, for example myapp:1.0&#34;),
+    tool(&#34;verify_deployment&#34;, &#34;Check that the deployment is running.&#34;, cluster_name=&#34;Cluster name&#34;),
+]
+
+SYSTEM = (
+    &#34;You are a DevOps agent. Work toward the user&#39;s goal step by step using the tools. &#34;
+    &#34;Check the subscription first. If a tool returns an error, read it and fix the problem. &#34;
+    &#34;When finished, give a short report of what you did.&#34;
+)
+
+def run_agent(goal: str, max_steps: int = 10) -&gt; str:
+    messages = [{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: SYSTEM}, {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: goal}]
+    for step in range(1, max_steps + 1):
+        msg = client.chat.completions.create(model=MODEL, messages=messages, tools=TOOLS).choices[0].message
+
+        if not msg.tool_calls:                    # no more tools needed: the agent is finished
+            return msg.content
+
+        messages.append(msg)
+        for call in msg.tool_calls:
+            args = json.loads(call.function.arguments)
+            print(f&#34;[{step}] ACT:     {call.function.name}({args})&#34;)
+            result = REGISTRY[call.function.name](**args)
+            print(f&#34;[{step}] OBSERVE: {result}&#34;)
+            messages.append({&#34;role&#34;: &#34;tool&#34;, &#34;tool_call_id&#34;: call.id, &#34;content&#34;: json.dumps(result)})
+    return &#34;Stopped: step limit reached.&#34;
+
+print(run_agent(&#34;Create an AKS cluster called aks-demo in resource group rg-demo and deploy image myapp:1.0.&#34;))
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">using System.ComponentModel;
+using Microsoft.Extensions.AI;
+using OpenAI;
+
+IChatClient agent = new ChatClientBuilder(
+        new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+            .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient())
+    .UseFunctionInvocation(configure: c =&gt; c.MaximumIterationsPerRequest = 10)   // step limit
+    .Build();
+
+// ---- Fake cloud state. Nothing real is created. ----
+var resourceGroups = new HashSet&lt;string&gt;();
+var clusters = new HashSet&lt;string&gt;();
+var deployed = new HashSet&lt;string&gt;();
+
+[Description(&#34;Check that the Azure subscription is enabled.&#34;)]
+string CheckSubscription()
+{
+    Console.WriteLine(&#34;ACT: check_subscription&#34;);
+    return &#34;Subscription demo-subscription is Enabled.&#34;;
+}
+
+[Description(&#34;Create an Azure resource group.&#34;)]
+string CreateResourceGroup([Description(&#34;Resource group name&#34;)] string name)
+{
+    Console.WriteLine($&#34;ACT: create_resource_group({name})&#34;);
+    resourceGroups.Add(name);
+    return $&#34;Resource group {name} created.&#34;;
+}
+
+[Description(&#34;Create an AKS cluster inside an existing resource group.&#34;)]
+string CreateAksCluster(
+    [Description(&#34;Existing resource group name&#34;)] string resourceGroup,
+    [Description(&#34;New cluster name&#34;)] string clusterName)
+{
+    Console.WriteLine($&#34;ACT: create_aks_cluster({resourceGroup}, {clusterName})&#34;);
+    if (!resourceGroups.Contains(resourceGroup))
+        return $&#34;Error: resource group {resourceGroup} does not exist. Create it first.&#34;;
+    clusters.Add(clusterName);
+    return $&#34;Cluster {clusterName} created.&#34;;
+}
+
+[Description(&#34;Deploy a container image to an existing AKS cluster.&#34;)]
+string DeployApp(
+    [Description(&#34;Existing cluster name&#34;)] string clusterName,
+    [Description(&#34;Container image, for example myapp:1.0&#34;)] string image)
+{
+    Console.WriteLine($&#34;ACT: deploy_app({clusterName}, {image})&#34;);
+    if (!clusters.Contains(clusterName))
+        return $&#34;Error: cluster {clusterName} does not exist. Create it first.&#34;;
+    deployed.Add(image);
+    return $&#34;Deployed {image} to {clusterName}.&#34;;
+}
+
+[Description(&#34;Check that the deployment is running.&#34;)]
+string VerifyDeployment([Description(&#34;Cluster name&#34;)] string clusterName)
+{
+    Console.WriteLine($&#34;ACT: verify_deployment({clusterName})&#34;);
+    return $&#34;Cluster {clusterName}: {(deployed.Count &gt; 0 ? 3 : 0)} pods running.&#34;;
+}
+
+var options = new ChatOptions
+{
+    Tools =
+    [
+        AIFunctionFactory.Create(CheckSubscription, &#34;check_subscription&#34;),
+        AIFunctionFactory.Create(CreateResourceGroup, &#34;create_resource_group&#34;),
+        AIFunctionFactory.Create(CreateAksCluster, &#34;create_aks_cluster&#34;),
+        AIFunctionFactory.Create(DeployApp, &#34;deploy_app&#34;),
+        AIFunctionFactory.Create(VerifyDeployment, &#34;verify_deployment&#34;)
+    ]
+};
+
+var messages = new List&lt;ChatMessage&gt;
+{
+    new(ChatRole.System,
+        &#34;You are a DevOps agent. Work toward the user&#39;s goal step by step using the tools. &#34; +
+        &#34;Check the subscription first. If a tool returns an error, read it and fix the problem. &#34; +
+        &#34;When finished, give a short report of what you did.&#34;),
+    new(ChatRole.User,
+        &#34;Create an AKS cluster called aks-demo in resource group rg-demo and deploy image myapp:1.0.&#34;)
+};
+
+var response = await agent.GetResponseAsync(messages, options);
+Console.WriteLine(response.Text);
+</code></pre>
+<h3>How to read this code (line by line for beginners)</h3>
+<ol>
+<li><strong>The tool functions</strong> are ordinary code. They have no AI in them.</li>
+<li><strong>The tool descriptions</strong> (the <code>tool(...)</code> helper in Python, <code>[Description]</code> in C#) are what the model reads to decide which tool to use. Clear descriptions mean better decisions.</li>
+<li><strong>The system prompt</strong> is the agent's job description: its role, its rules, and when it is done.</li>
+<li><strong>The loop</strong> (explicit in Python, hidden inside <code>UseFunctionInvocation()</code> in C#) repeats: ask the model, run any tools it requested, send the results back, repeat.</li>
+<li><strong>The step limit</strong> (<code>max_steps</code>, <code>MaximumIterationsPerRequest</code>) stops a confused agent from looping forever.</li>
+<li><strong>The <code>ACT</code> and <code>OBSERVE</code> lines</strong> let you watch the agent work. Compare them to the Reason, Act, Observe diagram in 0.3.</li>
+</ol>
+<h3>Try these experiments</h3>
+<ol>
+<li>Ask for a deploy without mentioning the resource group. Watch whether the agent creates one first or hits an error and recovers.</li>
+<li>Change the goal to: <em>&quot;Just tell me the steps to create an AKS cluster.&quot;</em> A well-behaved agent may answer in text without calling any tool. That is Gen AI behavior inside an agent.</li>
+<li>Remove the line &quot;If a tool returns an error, read it and fix the problem&quot; and compare behavior.</li>
+<li>Set the step limit to 2 and see what happens when the task needs more steps.</li>
+<li>Add a sixth tool, <code>delete_resource_group</code>, and discuss why it would need a human approval step in a real system.</li>
+</ol>
+<p><strong>Trainer tip:</strong> This demo is the best &quot;aha&quot; moment for newcomers. Run it live, point at the <code>ACT</code> and <code>OBSERVE</code> lines, and say: &quot;That printed trace is the whole difference between a chatbot and an agent.&quot;</p>
+<hr>
+<h2>0.8 Common beginner questions</h2>
+<p><strong>Is an agent a different kind of model?</strong>
+No. It is a normal LLM plus instructions, tools, memory, and a loop of your code.</p>
+<p><strong>Does the AI actually run Azure CLI or my code?</strong>
+No. It asks for a tool to be called. Your program runs it and returns the result. This is why you control permissions and safety.</p>
+<p><strong>Do I need to train my own model?</strong>
+Almost never. You use an existing model through an API and shape its behavior with prompts, your data (RAG), and tools.</p>
+<p><strong>Is Agentic AI always better than Gen AI?</strong>
+No. Agents cost more, are slower, and are less predictable. If one prompt answers the question, use one prompt.</p>
+<p><strong>Can an agent make mistakes?</strong>
+Yes. It can choose the wrong tool, misread a result, or confidently say something false. That is why we add limits, validation, logging, and human approval for risky actions.</p>
+<p><strong>Which language should I learn first, C# or Python?</strong>
+Either works. The concepts are identical, which is why this guide shows both. Use the one your team uses.</p>
+<hr>
+<h1>Part 1: Generative AI</h1>
+<h2>1.1 Definition</h2>
+<p><strong>Generative AI</strong> is a class of AI models that produce new content (text, code, images, audio, video) by learning patterns from large amounts of training data. A <strong>Large Language Model (LLM)</strong> is the text-focused kind. It predicts the next piece of text (a token) given everything before it, and by repeating that step it writes whole answers.</p>
+<h2>1.2 Why it exists and what it gives you</h2>
+<p>Before LLMs, software handled structured data well (tables, forms, rules) but struggled with unstructured language: emails, contracts, call notes, policies. Rules and keyword matching broke on the endless variety of human wording.</p>
+<p>LLMs changed this in three ways:</p>
+<ol>
+<li><strong>They understand and produce natural language.</strong> You describe a task in plain words instead of writing parsing code.</li>
+<li><strong>One model covers many tasks.</strong> Summarizing, classifying, extracting, translating, and drafting all use the same model with different instructions.</li>
+<li><strong>They can follow instructions they were never explicitly trained on.</strong> You change behavior by changing the prompt, not by retraining.</li>
+</ol>
+<p>Typical business uses: summarizing documents, drafting replies, extracting fields from text, classifying tickets, answering questions over internal content, generating code, and acting as the reasoning engine inside agents.</p>
+<h2>1.3 Core concepts, one by one</h2>
+<h3>Tokens</h3>
+<p>A token is a chunk of text, roughly three quarters of an English word on average. Models read and write tokens, and you are billed per token (input and output are priced separately). Why it matters: cost, speed, and the context limit all depend on token count.</p>
+<h3>Context window</h3>
+<p>The maximum number of tokens the model can consider in one request, covering your instructions, the conversation history, any documents you pass in, and the answer. The model has no memory outside this window. If you want it to &quot;remember&quot; something, you must send it again.</p>
+<h3>Prompt and message roles</h3>
+<p>A request is a list of messages with roles:</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>system</code></td>
+<td>Sets behavior, tone, rules, and boundaries. Highest priority instructions.</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>The person's request.</td>
+</tr>
+<tr>
+<td><code>assistant</code></td>
+<td>Earlier model replies (you send these back to keep a conversation going).</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Results returned from a function the model asked to call (used in agents).</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>Temperature and sampling</h3>
+<p>Temperature controls randomness. Low values (0 to 0.3) give consistent, focused answers, which suits extraction and classification. Higher values (0.7 to 1) give more varied wording, which suits brainstorming. It does not control &quot;creativity&quot; in a deep sense, only how adventurous the next-token choice is.</p>
+<h3>Hallucination</h3>
+<p>The model can state something false in a confident tone, because it generates plausible text, not verified facts. This is the main reason RAG exists (Part 2) and the reason you ground answers in sources and add checks.</p>
+<h3>Prompting, RAG, and fine-tuning: choosing the approach</h3>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>What changes</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prompt engineering</td>
+<td>The instructions you send</td>
+<td>Always start here. Cheap and fast.</td>
+</tr>
+<tr>
+<td>RAG</td>
+<td>The facts you send along with the question</td>
+<td>The model needs your private or current data.</td>
+</tr>
+<tr>
+<td>Fine-tuning</td>
+<td>The model's weights</td>
+<td>You need a consistent style or format, or a smaller model doing a narrow task. Not for adding facts.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Trainer tip:</strong> A very common student mistake is to say &quot;we need to fine-tune the model on our documents.&quot; Nearly always they need RAG. Ask: &quot;Is it a knowledge problem or a behavior problem?&quot;</p>
+<h3>Embeddings</h3>
+<p>An embedding turns text into a list of numbers (a vector) so that texts with similar meaning end up close together. This lets you search by meaning instead of keywords. &quot;Reset my password&quot; and &quot;I can't log in&quot; land near each other. Embeddings are the base of RAG.</p>
+<h2>1.4 Example 1: Your first call</h2>
+<p><strong>Python</strong></p>
+<pre><code class="language-python">import os
+from openai import OpenAI
+
+client = OpenAI()  # reads OPENAI_API_KEY
+MODEL = os.getenv(&#34;MODEL&#34;, &#34;gpt-4o-mini&#34;)
+
+response = client.chat.completions.create(
+    model=MODEL,
+    temperature=0.2,
+    messages=[
+        {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: &#34;You are a concise assistant for a healthcare IT team.&#34;},
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Explain what an API gateway does in 3 sentences.&#34;},
+    ],
+)
+
+print(response.choices[0].message.content)
+print(&#34;Tokens used:&#34;, response.usage.total_tokens)
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">using Microsoft.Extensions.AI;
+using OpenAI;
+
+IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsIChatClient();
+
+var messages = new List&lt;ChatMessage&gt;
+{
+    new(ChatRole.System, &#34;You are a concise assistant for a healthcare IT team.&#34;),
+    new(ChatRole.User, &#34;Explain what an API gateway does in 3 sentences.&#34;)
+};
+
+var response = await client.GetResponseAsync(messages, new ChatOptions { Temperature = 0.2f });
+
+Console.WriteLine(response.Text);
+Console.WriteLine($&#34;Tokens used: {response.Usage?.TotalTokenCount}&#34;);
+</code></pre>
+<p><strong>What to point out to students</strong></p>
+<ol>
+<li>The model is stateless. Each call carries the full message list.</li>
+<li><code>IChatClient</code> in C# is a provider-neutral interface. Swap OpenAI for Azure OpenAI or a local model by changing only the line that creates the client. (In older Microsoft.Extensions.AI.OpenAI versions the method is called <code>AsChatClient</code>. It was renamed <code>AsIChatClient</code>.)</li>
+<li>Show <code>usage</code> early. Tokens equal money.</li>
+</ol>
+<h2>1.5 Example 2: Streaming and structured output</h2>
+<p>Streaming shows tokens as they arrive, which makes apps feel faster.</p>
+<p><strong>Python</strong></p>
+<pre><code class="language-python">stream = client.chat.completions.create(
+    model=MODEL,
+    messages=[{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Write a haiku about audit logs.&#34;}],
+    stream=True,
+)
+for chunk in stream:
+    delta = chunk.choices[0].delta.content
+    if delta:
+        print(delta, end=&#34;&#34;, flush=True)
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">await foreach (var update in client.GetStreamingResponseAsync(&#34;Write a haiku about audit logs.&#34;))
+{
+    Console.Write(update.Text);
+}
+</code></pre>
+<p>Structured output means asking for JSON so your code can parse it. Always validate the result, because the model can still return malformed data.</p>
+<p><strong>Python</strong></p>
+<pre><code class="language-python">import json
+
+resp = client.chat.completions.create(
+    model=MODEL,
+    temperature=0,
+    response_format={&#34;type&#34;: &#34;json_object&#34;},
+    messages=[
+        {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: &#34;Extract fields. Reply with JSON only: {\&#34;name\&#34;: str, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;},
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;Urgent: Maria Lopez cannot access the claims portal.&#34;},
+    ],
+)
+data = json.loads(resp.choices[0].message.content)
+print(data)
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">using System.Text.Json;
+
+var resp = await client.GetResponseAsync(
+    new[]
+    {
+        new ChatMessage(ChatRole.System, &#34;Extract fields. Reply with JSON only: {\&#34;name\&#34;: string, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;),
+        new ChatMessage(ChatRole.User, &#34;Urgent: Maria Lopez cannot access the claims portal.&#34;)
+    },
+    new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
+
+var doc = JsonDocument.Parse(resp.Text);
+Console.WriteLine(doc.RootElement.GetProperty(&#34;priority&#34;).GetString());
+</code></pre>
+<p>C# also supports strongly typed results through <code>GetResponseAsync&lt;T&gt;(...)</code> in Microsoft.Extensions.AI, which deserializes into your own class. Show it once students are comfortable with the raw JSON version.</p>
+<hr>
+<h1>Part 2: RAG (Retrieval-Augmented Generation)</h1>
+<h2>2.1 Definition</h2>
+<p><strong>RAG</strong> is a pattern where you first <strong>retrieve</strong> relevant pieces of your own data, then <strong>augment</strong> the prompt with them, then let the model <strong>generate</strong> an answer based on that material.</p>
+<h2>2.2 Why and what</h2>
+<p>An LLM only knows what was in its training data. It does not know your policies, your product docs, last week's incident report, or a customer's record. It also cannot cite where an answer came from.</p>
+<p>RAG fixes this without retraining:</p>
+<ol>
+<li><strong>Fresh and private knowledge.</strong> Update the document store and answers change immediately.</li>
+<li><strong>Fewer hallucinations.</strong> The model is told to answer from the supplied text.</li>
+<li><strong>Traceability.</strong> You can show the source passage for every answer.</li>
+<li><strong>Access control.</strong> You can filter retrieved content by who is asking.</li>
+</ol>
+<h2>2.3 The pipeline, step by step</h2>
+<p><strong>Indexing (done ahead of time)</strong></p>
+<ol>
+<li><strong>Load</strong> documents (PDF, Word, web pages, database rows).</li>
+<li><strong>Clean and chunk</strong> them into passages. Chunk size is a trade-off. Too large and retrieval gets vague and costs more tokens. Too small and a chunk loses the context needed to make sense. A common start is 300 to 800 tokens with about 10 to 15 percent overlap.</li>
+<li><strong>Embed</strong> each chunk into a vector.</li>
+<li><strong>Store</strong> vectors and the original text (plus metadata such as source, date, and permissions) in a vector store.</li>
+</ol>
+<p><strong>Query time (every question)</strong></p>
+<ol start="5">
+<li><strong>Embed the question</strong> with the same embedding model.</li>
+<li><strong>Retrieve</strong> the top K most similar chunks (cosine similarity is the usual measure).</li>
+<li><strong>Build the prompt:</strong> instructions, the retrieved chunks, and the question.</li>
+<li><strong>Generate</strong> the answer and return it with the sources.</li>
+</ol>
+<p><strong>Trainer tip:</strong> Draw this as two lanes on a whiteboard: &quot;Before the user arrives&quot; (indexing) and &quot;When the user asks&quot; (querying). Students mix them up constantly.</p>
+<h2>2.4 Example: A RAG system in about 50 lines</h2>
+<p>This example keeps vectors in memory so students can see every step. Replace it with a real vector store for production.</p>
+<p><strong>Python</strong></p>
+<pre><code class="language-python">import numpy as np
+from openai import OpenAI
+
+client = OpenAI()
+CHAT_MODEL = &#34;gpt-4o-mini&#34;
+EMBED_MODEL = &#34;text-embedding-3-small&#34;
+
+documents = {
+    &#34;leave-policy.txt&#34;: &#34;Employees receive 20 days of paid leave per year. Unused leave up to 5 days carries over to the next year.&#34;,
+    &#34;remote-work.txt&#34;: &#34;Staff may work remotely up to 3 days per week with manager approval. Core hours are 10:00 to 15:00.&#34;,
+    &#34;expense-policy.txt&#34;: &#34;Expenses above 200 USD need director approval. Receipts must be submitted within 30 days.&#34;,
+}
+
+def embed(texts):
+    result = client.embeddings.create(model=EMBED_MODEL, input=texts)
+    vectors = np.array([d.embedding for d in result.data])
+    return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)  # normalize
+
+# ---- Indexing ----
+chunks = []  # (source, text)
+for source, text in documents.items():
+    chunks.append((source, text))  # real docs: split into smaller chunks first
+index = embed([c[1] for c in chunks])
+
+# ---- Query ----
+def retrieve(question, k=2):
+    q = embed([question])[0]
+    scores = index @ q                       # cosine similarity (vectors are normalized)
+    top = np.argsort(scores)[::-1][:k]
+    return [(chunks[i], float(scores[i])) for i in top]
+
+def answer(question):
+    hits = retrieve(question)
+    context = &#34;\n\n&#34;.join(f&#34;[{src}] {text}&#34; for (src, text), _ in hits)
+    system = (
+        &#34;Answer using ONLY the context below. &#34;
+        &#34;If the answer is not in the context, say you do not know. &#34;
+        &#34;Cite the source name in square brackets.&#34;
+    )
+    resp = client.chat.completions.create(
+        model=CHAT_MODEL,
+        temperature=0,
+        messages=[
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: f&#34;Context:\n{context}\n\nQuestion: {question}&#34;},
+        ],
+    )
+    return resp.choices[0].message.content
+
+print(answer(&#34;How many days can I work from home?&#34;))
+print(answer(&#34;What is the dress code?&#34;))   # should say it does not know
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">using System.Numerics.Tensors;
+using Microsoft.Extensions.AI;
+using OpenAI;
+
+var openAi = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!);
+IChatClient chat = openAi.GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
+IEmbeddingGenerator&lt;string, Embedding&lt;float&gt;&gt; embedder =
+    openAi.GetEmbeddingClient(&#34;text-embedding-3-small&#34;).AsIEmbeddingGenerator();
+
+var documents = new Dictionary&lt;string, string&gt;
+{
+    [&#34;leave-policy.txt&#34;]   = &#34;Employees receive 20 days of paid leave per year. Unused leave up to 5 days carries over to the next year.&#34;,
+    [&#34;remote-work.txt&#34;]    = &#34;Staff may work remotely up to 3 days per week with manager approval. Core hours are 10:00 to 15:00.&#34;,
+    [&#34;expense-policy.txt&#34;] = &#34;Expenses above 200 USD need director approval. Receipts must be submitted within 30 days.&#34;
+};
+
+// ---- Indexing ----
+var sources = documents.Keys.ToList();
+var texts   = documents.Values.ToList();
+var vectors = await embedder.GenerateAsync(texts);   // one embedding per text
+
+// ---- Query ----
+async Task&lt;string&gt; AnswerAsync(string question, int k = 2)
+{
+    var q = (await embedder.GenerateAsync(new[] { question }))[0].Vector;
+
+    var top = vectors
+        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Vector.Span)))
+        .OrderByDescending(x =&gt; x.Score)
+        .Take(k)
+        .ToList();
+
+    var context = string.Join(&#34;\n\n&#34;, top.Select(t =&gt; $&#34;[{sources[t.Index]}] {texts[t.Index]}&#34;));
+
+    var messages = new List&lt;ChatMessage&gt;
+    {
+        new(ChatRole.System,
+            &#34;Answer using ONLY the context below. If the answer is not in the context, say you do not know. Cite the source name in square brackets.&#34;),
+        new(ChatRole.User, $&#34;Context:\n{context}\n\nQuestion: {question}&#34;)
+    };
+
+    var response = await chat.GetResponseAsync(messages, new ChatOptions { Temperature = 0 });
+    return response.Text;
+}
+
+Console.WriteLine(await AnswerAsync(&#34;How many days can I work from home?&#34;));
+Console.WriteLine(await AnswerAsync(&#34;What is the dress code?&#34;));
+</code></pre>
+<p><strong>What to point out</strong></p>
+<ol>
+<li>The second question (dress code) is the best teaching moment. A correct RAG system admits it does not know. Remove the &quot;ONLY the context&quot; instruction and watch the model invent an answer.</li>
+<li>The same embedding model must be used for documents and questions.</li>
+<li>Temperature 0 keeps grounded answers stable.</li>
+</ol>
+<h2>2.5 Why RAG fails (and the fixes)</h2>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Right document exists but is not retrieved</td>
+<td>Poor chunking, or keyword-heavy query</td>
+<td>Better chunk size, add <strong>hybrid search</strong> (vector plus keyword), add a <strong>reranker</strong></td>
+</tr>
+<tr>
+<td>Answer mixes unrelated facts</td>
+<td>K too high, noisy chunks</td>
+<td>Lower K, add metadata filters, rerank</td>
+</tr>
+<tr>
+<td>Model ignores the context</td>
+<td>Weak instruction</td>
+<td>Stronger system prompt, lower temperature</td>
+</tr>
+<tr>
+<td>Outdated answers</td>
+<td>Index not refreshed</td>
+<td>Scheduled or event-driven re-indexing</td>
+</tr>
+<tr>
+<td>Users see data they should not</td>
+<td>No permission filter</td>
+<td>Store ACL metadata and filter at retrieval time</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>2.6 Production building blocks</h2>
+<ol>
+<li><strong>Vector stores:</strong> Azure AI Search, PostgreSQL with pgvector, Elasticsearch, Qdrant, Pinecone, Chroma.</li>
+<li><strong>Hybrid search and reranking:</strong> combine keyword and vector scores, then re-order the top results with a reranker model.</li>
+<li><strong>Query rewriting:</strong> have the model rewrite vague follow-ups (&quot;what about contractors?&quot;) into standalone queries.</li>
+<li><strong>Evaluation:</strong> keep a test set of questions with expected source passages. Measure retrieval hit rate and answer correctness before and after every change.</li>
+<li><strong>Agentic RAG:</strong> let an agent decide when to search, what to search for, and whether to search again (see Part 3).</li>
+</ol>
+<hr>
+<h1>Part 3: Agentic AI</h1>
+<h2>3.1 Definition</h2>
+<p><strong>Agentic AI</strong> is software where an LLM is given a goal, a set of tools, and the freedom to decide the steps needed to reach that goal. It observes results, adjusts, and continues until it finishes or is stopped. An <strong>agent</strong> is the unit that does this: model plus instructions plus tools plus memory, running in a loop.</p>
+<h2>3.2 Why and what</h2>
+<p>A plain LLM call answers once. It cannot check a database, call an API, or notice that its first attempt failed. Real work is multi-step and depends on live information: &quot;Find the customer's last three orders, see if any shipped late, and draft an apology with a refund offer if so.&quot;</p>
+<p>Agents exist to handle tasks where:</p>
+<ol>
+<li>The steps are not known in advance.</li>
+<li>The task needs information or actions outside the model (APIs, databases, files).</li>
+<li>The next step depends on the result of the previous one.</li>
+</ol>
+<h3>Chatbot vs workflow vs agent</h3>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th></th>
+<th>Chatbot / single call</th>
+<th>Workflow (fixed pipeline)</th>
+<th>Agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who decides the steps</td>
+<td>You</td>
+<td>You (in code)</td>
+<td>The model</td>
+</tr>
+<tr>
+<td>Predictability</td>
+<td>High</td>
+<td>High</td>
+<td>Lower</td>
+</tr>
+<tr>
+<td>Handles open-ended tasks</td>
+<td>Poor</td>
+<td>Poor</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>Cost and latency</td>
+<td>Low</td>
+<td>Low to medium</td>
+<td>Higher</td>
+</tr>
+<tr>
+<td>Typical use</td>
+<td>Q and A, summarize</td>
+<td>Extract, validate, route, store</td>
+<td>Research, support resolution, ops tasks</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Trainer tip:</strong> Tell students the rule most experienced teams follow: <em>use the simplest thing that works.</em> If you can write the steps down in advance, build a workflow. Use an agent only when the path genuinely cannot be fixed ahead of time.</p>
+<h2>3.3 Anatomy of an agent</h2>
+<ol>
+<li><strong>Model (the brain).</strong> Reads the situation and decides what to do next. Stronger models make better decisions in the loop.</li>
+<li><strong>Instructions (the role).</strong> The system prompt: who the agent is, what it may and may not do, when to stop, how to format results.</li>
+<li><strong>Tools (the hands).</strong> Functions the agent can call: search, database query, send email, create ticket, run code. Each tool has a name, a description, and a typed parameter schema. The description is what the model reads to decide when to use it, so write it carefully.</li>
+<li><strong>Memory.</strong>
+<ul>
+<li><em>Short-term:</em> the message history in the current run.</li>
+<li><em>Long-term:</em> facts stored outside the model (a database or vector store) and loaded when relevant.</li>
+</ul>
+</li>
+<li><strong>Planning and reasoning.</strong> Patterns for deciding steps:
+<ul>
+<li><strong>ReAct:</strong> think, act (call a tool), observe, repeat.</li>
+<li><strong>Plan-and-execute:</strong> make a plan first, then carry out each step.</li>
+<li><strong>Reflection:</strong> the agent critiques its own output and revises.</li>
+</ul>
+</li>
+<li><strong>The loop and the stop conditions.</strong> Call model, run requested tools, send results back, repeat until the model gives a final answer. Always add a maximum step count, a time limit, and a budget.</li>
+</ol>
+<h2>3.4 How tool calling works (the key mechanism)</h2>
+<p>This is the single most important thing to teach. Students often think the model runs the function. It does not.</p>
+<ol>
+<li>You send the model the question plus a list of tool definitions.</li>
+<li>The model replies, not with an answer, but with a request: &quot;Call <code>get_order_status</code> with <code>order_id = A-1001</code>.&quot;</li>
+<li><strong>Your code</strong> runs the function.</li>
+<li>You send the result back as a <code>tool</code> message.</li>
+<li>The model reads it and either asks for another tool or writes the final answer.</li>
+</ol>
+<p>The model proposes. Your code disposes. That is where you enforce permissions, validation, and approvals.</p>
+<h2>3.5 Example 3: An agent loop written by hand (Python)</h2>
+<p>Writing the loop once by hand removes the mystery from every framework you use later.</p>
+<pre><code class="language-python">import json, os
+from openai import OpenAI
+
+client = OpenAI()
+MODEL = os.getenv(&#34;MODEL&#34;, &#34;gpt-4o-mini&#34;)
+
+# ---- Tools (plain functions) ----
+ORDERS = {
+    &#34;A-1001&#34;: {&#34;status&#34;: &#34;Delivered&#34;, &#34;promised&#34;: &#34;2026-09-10&#34;, &#34;delivered&#34;: &#34;2026-09-14&#34;},
+    &#34;A-1002&#34;: {&#34;status&#34;: &#34;In transit&#34;, &#34;promised&#34;: &#34;2026-10-15&#34;, &#34;delivered&#34;: None},
+}
+
+def get_order_status(order_id: str) -&gt; dict:
+    return ORDERS.get(order_id, {&#34;error&#34;: &#34;Order not found&#34;})
+
+def issue_refund(order_id: str, amount: float) -&gt; dict:
+    # In real systems: check permissions, limits, and require approval for large amounts
+    if amount &gt; 50:
+        return {&#34;error&#34;: &#34;Amount above limit. Needs human approval.&#34;}
+    return {&#34;ok&#34;: True, &#34;order_id&#34;: order_id, &#34;refunded&#34;: amount}
+
+REGISTRY = {&#34;get_order_status&#34;: get_order_status, &#34;issue_refund&#34;: issue_refund}
+
+# ---- Tool schemas the model sees ----
+TOOLS = [
+    {
+        &#34;type&#34;: &#34;function&#34;,
+        &#34;function&#34;: {
+            &#34;name&#34;: &#34;get_order_status&#34;,
+            &#34;description&#34;: &#34;Look up the status and dates for a customer order.&#34;,
+            &#34;parameters&#34;: {
+                &#34;type&#34;: &#34;object&#34;,
+                &#34;properties&#34;: {&#34;order_id&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;description&#34;: &#34;Order id such as A-1001&#34;}},
+                &#34;required&#34;: [&#34;order_id&#34;],
+            },
+        },
+    },
+    {
+        &#34;type&#34;: &#34;function&#34;,
+        &#34;function&#34;: {
+            &#34;name&#34;: &#34;issue_refund&#34;,
+            &#34;description&#34;: &#34;Refund a customer. Only use after confirming the order was late.&#34;,
+            &#34;parameters&#34;: {
+                &#34;type&#34;: &#34;object&#34;,
+                &#34;properties&#34;: {
+                    &#34;order_id&#34;: {&#34;type&#34;: &#34;string&#34;},
+                    &#34;amount&#34;: {&#34;type&#34;: &#34;number&#34;, &#34;description&#34;: &#34;Amount in USD&#34;},
+                },
+                &#34;required&#34;: [&#34;order_id&#34;, &#34;amount&#34;],
+            },
+        },
+    },
+]
+
+SYSTEM = (
+    &#34;You are a customer support agent. Check order facts with tools before answering. &#34;
+    &#34;Never promise a refund without confirming the order was delivered late. &#34;
+    &#34;Be brief and polite.&#34;
+)
+
+def run_agent(goal: str, max_steps: int = 6) -&gt; str:
+    messages = [
+        {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: SYSTEM},
+        {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: goal},
+    ]
+    for step in range(max_steps):
+        resp = client.chat.completions.create(model=MODEL, messages=messages, tools=TOOLS)
+        msg = resp.choices[0].message
+
+        if not msg.tool_calls:                 # model is done
+            return msg.content
+
+        messages.append(msg)                   # keep the model&#39;s tool request in history
+        for call in msg.tool_calls:
+            args = json.loads(call.function.arguments)
+            print(f&#34;  step {step + 1}: {call.function.name}({args})&#34;)
+            result = REGISTRY[call.function.name](**args)
+            messages.append({
+                &#34;role&#34;: &#34;tool&#34;,
+                &#34;tool_call_id&#34;: call.id,
+                &#34;content&#34;: json.dumps(result),
+            })
+    return &#34;Stopped: step limit reached.&#34;
+
+print(run_agent(&#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;))
+</code></pre>
+<h2>3.6 Example 4: The same agent in C# with Microsoft.Extensions.AI</h2>
+<p>In C#, <code>UseFunctionInvocation()</code> adds the loop for you. It detects tool requests, calls your .NET methods, sends the results back, and repeats.</p>
+<pre><code class="language-csharp">using System.ComponentModel;
+using Microsoft.Extensions.AI;
+using OpenAI;
+
+IChatClient baseClient = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsIChatClient();
+
+IChatClient agent = new ChatClientBuilder(baseClient)
+    .UseFunctionInvocation()        // this is the agent loop
+    .Build();
+
+var orders = new Dictionary&lt;string, (string Status, string Promised, string? Delivered)&gt;
+{
+    [&#34;A-1001&#34;] = (&#34;Delivered&#34;, &#34;2026-09-10&#34;, &#34;2026-09-14&#34;),
+    [&#34;A-1002&#34;] = (&#34;In transit&#34;, &#34;2026-10-15&#34;, null)
+};
+
+[Description(&#34;Look up the status and dates for a customer order.&#34;)]
+string GetOrderStatus([Description(&#34;Order id such as A-1001&#34;)] string orderId) =&gt;
+    orders.TryGetValue(orderId, out var o)
+        ? $&#34;Status: {o.Status}, promised: {o.Promised}, delivered: {o.Delivered ?? &#34;not yet&#34;}&#34;
+        : &#34;Order not found&#34;;
+
+[Description(&#34;Refund a customer. Only use after confirming the order was late.&#34;)]
+string IssueRefund(string orderId, double amount) =&gt;
+    amount &gt; 50
+        ? &#34;Error: amount above limit, needs human approval.&#34;
+        : $&#34;Refunded {amount} USD for {orderId}&#34;;
+
+var options = new ChatOptions
+{
+    Tools =
+    [
+        AIFunctionFactory.Create(GetOrderStatus, &#34;get_order_status&#34;),
+        AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;)
+    ]
+};
+
+var messages = new List&lt;ChatMessage&gt;
+{
+    new(ChatRole.System,
+        &#34;You are a customer support agent. Check order facts with tools before answering. &#34; +
+        &#34;Never promise a refund without confirming the order was delivered late. Be brief and polite.&#34;),
+    new(ChatRole.User, &#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;)
+};
+
+var response = await agent.GetResponseAsync(messages, options);
+Console.WriteLine(response.Text);
+</code></pre>
+<p><strong>What to point out</strong></p>
+<ol>
+<li>Python version: you wrote the loop and the JSON schema. C# version: the framework builds the schema from the method signature and <code>[Description]</code> attributes and runs the loop. Same behavior, less code.</li>
+<li>The refund limit lives in code, not only in the prompt. Prompts can be talked around. Code cannot.</li>
+<li>Run it with <code>A-1002</code> (not yet delivered) and show the agent declining to refund.</li>
+</ol>
+<h2>3.7 Agentic RAG</h2>
+<p>Turn retrieval into a tool. Instead of always retrieving once, the agent decides whether to search, what query to use, and whether to search again if the first results were weak.</p>
+<p><strong>Python (add to the tools from Example 3, reusing <code>retrieve</code> from the RAG example)</strong></p>
+<pre><code class="language-python">def search_policies(query: str) -&gt; list:
+    return [{&#34;source&#34;: src, &#34;text&#34;: text} for (src, text), _ in retrieve(query, k=3)]
+
+REGISTRY[&#34;search_policies&#34;] = search_policies
+TOOLS.append({
+    &#34;type&#34;: &#34;function&#34;,
+    &#34;function&#34;: {
+        &#34;name&#34;: &#34;search_policies&#34;,
+        &#34;description&#34;: &#34;Search company policy documents. Use for any policy question.&#34;,
+        &#34;parameters&#34;: {
+            &#34;type&#34;: &#34;object&#34;,
+            &#34;properties&#34;: {&#34;query&#34;: {&#34;type&#34;: &#34;string&#34;}},
+            &#34;required&#34;: [&#34;query&#34;],
+        },
+    },
+})
+</code></pre>
+<p><strong>C#</strong></p>
+<pre><code class="language-csharp">[Description(&#34;Search company policy documents. Use for any policy question.&#34;)]
+async Task&lt;string&gt; SearchPolicies(string query)
+{
+    var q = (await embedder.GenerateAsync(new[] { query }))[0].Vector;
+    var top = vectors
+        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Vector.Span)))
+        .OrderByDescending(x =&gt; x.Score).Take(3);
+    return string.Join(&#34;\n&#34;, top.Select(t =&gt; $&#34;[{sources[t.Index]}] {texts[t.Index]}&#34;));
+}
+
+options.Tools!.Add(AIFunctionFactory.Create(SearchPolicies, &#34;search_policies&#34;));
+</code></pre>
+<h2>3.8 Model Context Protocol (MCP) and tools at scale</h2>
+<p>Writing every tool by hand does not scale. <strong>MCP</strong> is an open protocol that lets an agent connect to external tool servers (for example a work-item system, a log platform, or a database) through one standard interface. Tools are discovered at runtime instead of being hard-coded. Both Python and C# have MCP client libraries, and Microsoft Agent Framework supports MCP.</p>
+<p>The related <strong>A2A (Agent-to-Agent)</strong> protocol covers one agent calling another agent across systems. For a first course, mention both and focus on plain tool calling.</p>
+<hr>
+<h1>Part 4: Event-based agents</h1>
+<h2>4.1 Definition</h2>
+<p>An <strong>event-based (event-driven) agent</strong> does not wait for a person to type a prompt. It is <strong>triggered by an event</strong>: a message arriving on a queue, a webhook call, a file landing in storage, a new ticket, a failed pipeline, an alert, or a schedule.</p>
+<h2>4.2 Why and what</h2>
+<p>Most business work starts with something happening, not someone asking. Event-driven agents let AI sit inside existing systems:</p>
+<ol>
+<li>A support ticket arrives, so an agent classifies it, drafts a reply, and routes it.</li>
+<li>A pipeline fails, so an agent reads the logs and posts a probable cause to the team channel.</li>
+<li>A claim document is uploaded, so an agent extracts fields and flags missing information.</li>
+<li>Every night at 2 AM, an agent summarizes the day's errors.</li>
+</ol>
+<p>Benefits: automation without a human starting it, natural fit with queues and serverless platforms, and easy scaling (add more consumers).</p>
+<h2>4.3 Design points (explain each one)</h2>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Point</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Trigger</strong></td>
+<td>Queue (Azure Service Bus, Kafka, RabbitMQ), HTTP webhook, Event Grid, timer, or storage event.</td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td>Events can be delivered twice. The agent must not refund twice or send two emails. Store processed event ids.</td>
+</tr>
+<tr>
+<td><strong>Retries and dead-letter queue</strong></td>
+<td>Model calls fail and time out. Retry with backoff, then park the event for review.</td>
+</tr>
+<tr>
+<td><strong>Guardrails and approvals</strong></td>
+<td>Nobody is watching live, so risky actions need limits or a human approval step.</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>Log each event id, tool calls, outcome, tokens, and cost. You will need this to debug at 3 AM.</td>
+</tr>
+<tr>
+<td><strong>Rate limiting and cost control</strong></td>
+<td>An event storm can mean thousands of model calls. Cap concurrency and set budgets.</td>
+</tr>
+<tr>
+<td><strong>Stateless handlers</strong></td>
+<td>Keep state in a database, not in the process, so any instance can handle any event.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>4.4 Example 5: Ticket triage agent driven by a queue (Python)</h2>
+<p>An in-process queue shows the shape. In production, replace it with Service Bus, Kafka, or an Azure Function trigger. The agent code stays the same.</p>
+<pre><code class="language-python">import asyncio, json
+from openai import OpenAI
+
+client = OpenAI()
+MODEL = &#34;gpt-4o-mini&#34;
+processed_ids = set()              # production: a database table
+
+def triage(ticket: dict) -&gt; dict:
+    resp = client.chat.completions.create(
+        model=MODEL,
+        temperature=0,
+        response_format={&#34;type&#34;: &#34;json_object&#34;},
+        messages=[
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;:
+                &#34;You triage IT tickets. Reply JSON only: &#34;
+                &#34;{\&#34;category\&#34;: \&#34;access|bug|request|outage\&#34;, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;, \&#34;reply\&#34;: str}&#34;},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: ticket[&#34;text&#34;]},
+        ],
+    )
+    return json.loads(resp.choices[0].message.content)
+
+async def worker(name: str, queue: asyncio.Queue):
+    while True:
+        event = await queue.get()
+        try:
+            if event[&#34;id&#34;] in processed_ids:           # idempotency
+                continue
+            result = await asyncio.to_thread(triage, event)   # SDK call is blocking
+            processed_ids.add(event[&#34;id&#34;])
+            print(f&#34;[{name}] ticket {event[&#39;id&#39;]} -&gt; {result[&#39;category&#39;]}/{result[&#39;priority&#39;]}&#34;)
+            if result[&#34;priority&#34;] == &#34;high&#34;:
+                print(f&#34;[{name}] ALERT on-call: {event[&#39;text&#39;]}&#34;)
+        except Exception as ex:
+            print(f&#34;[{name}] failed {event[&#39;id&#39;]}: {ex}&#34;)   # production: retry, then dead-letter
+        finally:
+            queue.task_done()
+
+async def main():
+    queue = asyncio.Queue()
+    workers = [asyncio.create_task(worker(f&#34;w{i}&#34;, queue)) for i in range(2)]
+
+    # Simulated events (in real life: webhook or message broker)
+    await queue.put({&#34;id&#34;: &#34;T-1&#34;, &#34;text&#34;: &#34;Production claims API is returning 500 for all users.&#34;})
+    await queue.put({&#34;id&#34;: &#34;T-2&#34;, &#34;text&#34;: &#34;Please add me to the QA Slack channel.&#34;})
+    await queue.put({&#34;id&#34;: &#34;T-1&#34;, &#34;text&#34;: &#34;Production claims API is returning 500 for all users.&#34;})  # duplicate
+
+    await queue.join()
+    for w in workers:
+        w.cancel()
+
+asyncio.run(main())
+</code></pre>
+<h2>4.5 The same pattern in C# with <code>Channel&lt;T&gt;</code></h2>
+<pre><code class="language-csharp">using System.Text.Json;
+using System.Threading.Channels;
+using Microsoft.Extensions.AI;
+using OpenAI;
+
+IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
+
+var processed = new HashSet&lt;string&gt;();               // production: a database table
+var channel = Channel.CreateBounded&lt;TicketEvent&gt;(100);   // bounded = built-in back pressure
+
+// Consumer (in a real service this is a BackgroundService or an Azure Function trigger)
+var consumer = Task.Run(async () =&gt;
+{
+    await foreach (var evt in channel.Reader.ReadAllAsync())
+    {
+        if (!processed.Add(evt.Id)) continue;        // idempotency
+
+        try
+        {
+            var response = await client.GetResponseAsync(
+                new[]
+                {
+                    new ChatMessage(ChatRole.System,
+                        &#34;You triage IT tickets. Reply JSON only: {\&#34;category\&#34;: \&#34;access|bug|request|outage\&#34;, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;),
+                    new ChatMessage(ChatRole.User, evt.Text)
+                },
+                new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
+
+            var json = JsonDocument.Parse(response.Text).RootElement;
+            var priority = json.GetProperty(&#34;priority&#34;).GetString();
+            Console.WriteLine($&#34;Ticket {evt.Id}: {json.GetProperty(&#34;category&#34;).GetString()}/{priority}&#34;);
+            if (priority == &#34;high&#34;) Console.WriteLine($&#34;ALERT on-call: {evt.Text}&#34;);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($&#34;Failed {evt.Id}: {ex.Message}&#34;);   // production: retry, then dead-letter
+        }
+    }
+});
+
+// Producer (in real life: HTTP endpoint, Service Bus message, Event Grid event)
+await channel.Writer.WriteAsync(new TicketEvent(&#34;T-1&#34;, &#34;Production claims API is returning 500 for all users.&#34;));
+await channel.Writer.WriteAsync(new TicketEvent(&#34;T-2&#34;, &#34;Please add me to the QA Slack channel.&#34;));
+await channel.Writer.WriteAsync(new TicketEvent(&#34;T-1&#34;, &#34;Production claims API is returning 500 for all users.&#34;)); // duplicate
+channel.Writer.Complete();
+await consumer;
+
+record TicketEvent(string Id, string Text);
+</code></pre>
+<p><strong>Production mapping to mention in class</strong></p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Azure option</th>
+<th>Other option</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Message trigger</td>
+<td>Service Bus or Event Hubs plus Azure Functions</td>
+<td>Kafka, RabbitMQ</td>
+</tr>
+<tr>
+<td>File or blob event</td>
+<td>Event Grid plus Functions</td>
+<td>S3 events plus Lambda</td>
+</tr>
+<tr>
+<td>Schedule</td>
+<td>Timer-triggered Function</td>
+<td>Cron, Hangfire, Quartz.NET</td>
+</tr>
+<tr>
+<td>Long-running, durable steps</td>
+<td>Durable Functions</td>
+<td>Temporal</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Trainer tip:</strong> Ask students, &quot;What happens if this agent runs twice on the same event?&quot; That one question teaches idempotency better than a slide.</p>
+<hr>
+<h1>Part 5: Multi-agent systems</h1>
+<h2>5.1 Definition</h2>
+<p>A <strong>multi-agent system</strong> uses several agents, each with its own role, instructions, and tools, that cooperate to finish a larger task.</p>
+<h2>5.2 Why and what</h2>
+<p>One agent with 30 tools and a huge prompt tends to get confused, picks the wrong tool, and is hard to test. Splitting the work gives you:</p>
+<ol>
+<li><strong>Focus.</strong> Each agent has a short, clear role and a small toolset.</li>
+<li><strong>Specialization.</strong> Different models per role (a cheap model for classification, a stronger one for reasoning).</li>
+<li><strong>Checks and balances.</strong> A reviewer agent catches the writer agent's mistakes.</li>
+<li><strong>Easier testing and ownership.</strong> You can evaluate each agent separately.</li>
+</ol>
+<p>Costs: more model calls, more latency, and more places to fail. Do not use multi-agent where a single agent works.</p>
+<h2>5.3 Orchestration patterns</h2>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>How it works</th>
+<th>Good for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sequential (pipeline)</strong></td>
+<td>A then B then C, each passing output forward</td>
+<td>Draft, review, format</td>
+</tr>
+<tr>
+<td><strong>Concurrent (fan-out / fan-in)</strong></td>
+<td>Several agents work in parallel, results are merged</td>
+<td>Research from multiple angles, multi-document analysis</td>
+</tr>
+<tr>
+<td><strong>Router / handoff</strong></td>
+<td>A triage agent picks the right specialist and hands over</td>
+<td>Support desks, helpdesks</td>
+</tr>
+<tr>
+<td><strong>Supervisor (manager-workers)</strong></td>
+<td>A manager agent plans, delegates subtasks, collects results</td>
+<td>Complex open-ended tasks</td>
+</tr>
+<tr>
+<td><strong>Group chat / debate</strong></td>
+<td>Agents discuss in turns, a moderator decides when done</td>
+<td>Brainstorming, review panels</td>
+</tr>
+<tr>
+<td><strong>Magentic-style (planner with ledger)</strong></td>
+<td>A planner tracks tasks and progress, and assigns agents dynamically</td>
+<td>Long, complex goals</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>5.4 Example 6: Sequential agents with a review loop (Python)</h2>
+<p>A small helper turns &quot;system prompt plus input&quot; into an agent. Three agents then work in order, and the reviewer can send work back.</p>
+<pre><code class="language-python">from openai import OpenAI
+
+client = OpenAI()
+MODEL = &#34;gpt-4o-mini&#34;
+
+def agent(role_prompt: str, task: str, temperature: float = 0.3) -&gt; str:
+    resp = client.chat.completions.create(
+        model=MODEL,
+        temperature=temperature,
+        messages=[
+            {&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: role_prompt},
+            {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: task},
+        ],
+    )
+    return resp.choices[0].message.content
+
+RESEARCHER = &#34;You are a researcher. List 5 key facts about the topic as short bullet points. No opinions.&#34;
+WRITER     = &#34;You are a writer. Turn the facts into a 120 word explainer for non-technical staff. Plain language.&#34;
+REVIEWER   = (&#34;You are a strict reviewer. Check the draft against the facts. &#34;
+              &#34;If everything is accurate and clear, reply exactly: APPROVED. &#34;
+              &#34;Otherwise list the specific problems.&#34;)
+
+def run_pipeline(topic: str, max_rounds: int = 3) -&gt; str:
+    facts = agent(RESEARCHER, f&#34;Topic: {topic}&#34;)
+    draft = agent(WRITER, f&#34;Facts:\n{facts}&#34;)
+
+    for round_no in range(max_rounds):
+        review = agent(REVIEWER, f&#34;Facts:\n{facts}\n\nDraft:\n{draft}&#34;, temperature=0)
+        print(f&#34;Round {round_no + 1} review: {review[:80]}...&#34;)
+        if review.strip().startswith(&#34;APPROVED&#34;):
+            return draft
+        draft = agent(WRITER, f&#34;Facts:\n{facts}\n\nPrevious draft:\n{draft}\n\nFix these issues:\n{review}&#34;)
+    return draft   # stop after max rounds even if not approved
+
+print(run_pipeline(&#34;What is a vector database?&#34;))
+</code></pre>
+<h2>5.5 Example 7: Router and parallel agents (Python)</h2>
+<pre><code class="language-python">import asyncio, json
+from openai import AsyncOpenAI
+
+aclient = AsyncOpenAI()
+MODEL = &#34;gpt-4o-mini&#34;
+
+async def ask(system: str, user: str, json_mode: bool = False) -&gt; str:
+    kwargs = {&#34;response_format&#34;: {&#34;type&#34;: &#34;json_object&#34;}} if json_mode else {}
+    r = await aclient.chat.completions.create(
+        model=MODEL, temperature=0,
+        messages=[{&#34;role&#34;: &#34;system&#34;, &#34;content&#34;: system}, {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: user}],
+        **kwargs,
+    )
+    return r.choices[0].message.content
+
+SPECIALISTS = {
+    &#34;billing&#34;:   &#34;You are a billing specialist. Answer clearly and offer next steps.&#34;,
+    &#34;technical&#34;: &#34;You are a technical support engineer. Give numbered troubleshooting steps.&#34;,
+    &#34;general&#34;:   &#34;You are a friendly general support agent.&#34;,
+}
+
+async def router(question: str) -&gt; str:
+    out = await ask(
+        &#34;Classify the request. Reply JSON only: {\&#34;route\&#34;: \&#34;billing|technical|general\&#34;}&#34;,
+        question, json_mode=True)
+    route = json.loads(out).get(&#34;route&#34;, &#34;general&#34;)
+    return route if route in SPECIALISTS else &#34;general&#34;     # never trust model output blindly
+
+async def handle(question: str) -&gt; str:
+    route = await router(question)
+    print(f&#34;Routed to: {route}&#34;)
+    return await ask(SPECIALISTS[route], question)
+
+async def parallel_review(document: str) -&gt; dict:
+    &#34;&#34;&#34;Fan-out: three reviewers run at the same time, then results are merged.&#34;&#34;&#34;
+    reviewers = {
+        &#34;security&#34;:   &#34;Review for security risks. 3 bullets max.&#34;,
+        &#34;compliance&#34;: &#34;Review for compliance and privacy concerns. 3 bullets max.&#34;,
+        &#34;clarity&#34;:    &#34;Review for clarity and ambiguity. 3 bullets max.&#34;,
+    }
+    results = await asyncio.gather(*(ask(p, document) for p in reviewers.values()))
+    return dict(zip(reviewers.keys(), results))
+
+async def main():
+    print(await handle(&#34;I was charged twice for my March invoice.&#34;))
+    print(await parallel_review(&#34;Users upload files and we store them in a public bucket for faster access.&#34;))
+
+asyncio.run(main())
+</code></pre>
+<h2>5.6 The same ideas in C#</h2>
+<pre><code class="language-csharp">using System.Text.Json;
+using Microsoft.Extensions.AI;
+using OpenAI;
+
+IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
+
+async Task&lt;string&gt; Ask(string system, string user, bool json = false, float temperature = 0f)
+{
+    var options = new ChatOptions { Temperature = temperature };
+    if (json) options.ResponseFormat = ChatResponseFormat.Json;
+    var r = await client.GetResponseAsync(
+        new[] { new ChatMessage(ChatRole.System, system), new ChatMessage(ChatRole.User, user) }, options);
+    return r.Text;
+}
+
+// ---- Sequential with review loop ----
+const string Researcher = &#34;You are a researcher. List 5 key facts about the topic as short bullet points. No opinions.&#34;;
+const string Writer     = &#34;You are a writer. Turn the facts into a 120 word explainer for non-technical staff. Plain language.&#34;;
+const string Reviewer   = &#34;You are a strict reviewer. If the draft is accurate and clear reply exactly: APPROVED. Otherwise list the problems.&#34;;
+
+async Task&lt;string&gt; RunPipeline(string topic, int maxRounds = 3)
+{
+    var facts = await Ask(Researcher, $&#34;Topic: {topic}&#34;);
+    var draft = await Ask(Writer, $&#34;Facts:\n{facts}&#34;, temperature: 0.3f);
+
+    for (int round = 1; round &lt;= maxRounds; round++)
+    {
+        var review = await Ask(Reviewer, $&#34;Facts:\n{facts}\n\nDraft:\n{draft}&#34;);
+        Console.WriteLine($&#34;Round {round}: {review[..Math.Min(80, review.Length)]}&#34;);
+        if (review.Trim().StartsWith(&#34;APPROVED&#34;)) return draft;
+        draft = await Ask(Writer, $&#34;Facts:\n{facts}\n\nPrevious draft:\n{draft}\n\nFix these issues:\n{review}&#34;, temperature: 0.3f);
+    }
+    return draft;
+}
+
+// ---- Router ----
+var specialists = new Dictionary&lt;string, string&gt;
+{
+    [&#34;billing&#34;]   = &#34;You are a billing specialist. Answer clearly and offer next steps.&#34;,
+    [&#34;technical&#34;] = &#34;You are a technical support engineer. Give numbered troubleshooting steps.&#34;,
+    [&#34;general&#34;]   = &#34;You are a friendly general support agent.&#34;
+};
+
+async Task&lt;string&gt; Handle(string question)
+{
+    var routeJson = await Ask(&#34;Classify the request. Reply JSON only: {\&#34;route\&#34;: \&#34;billing|technical|general\&#34;}&#34;, question, json: true);
+    var route = JsonDocument.Parse(routeJson).RootElement.GetProperty(&#34;route&#34;).GetString() ?? &#34;general&#34;;
+    if (!specialists.ContainsKey(route)) route = &#34;general&#34;;      // never trust model output blindly
+    Console.WriteLine($&#34;Routed to: {route}&#34;);
+    return await Ask(specialists[route], question);
+}
+
+// ---- Parallel fan-out / fan-in ----
+async Task&lt;Dictionary&lt;string, string&gt;&gt; ParallelReview(string document)
+{
+    var reviewers = new Dictionary&lt;string, string&gt;
+    {
+        [&#34;security&#34;]   = &#34;Review for security risks. 3 bullets max.&#34;,
+        [&#34;compliance&#34;] = &#34;Review for compliance and privacy concerns. 3 bullets max.&#34;,
+        [&#34;clarity&#34;]    = &#34;Review for clarity and ambiguity. 3 bullets max.&#34;
+    };
+    var tasks = reviewers.ToDictionary(r =&gt; r.Key, r =&gt; Ask(r.Value, document));
+    await Task.WhenAll(tasks.Values);
+    return tasks.ToDictionary(t =&gt; t.Key, t =&gt; t.Value.Result);
+}
+
+Console.WriteLine(await RunPipeline(&#34;What is a vector database?&#34;));
+Console.WriteLine(await Handle(&#34;I was charged twice for my March invoice.&#34;));
+foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we store them in a public bucket for faster access.&#34;))
+    Console.WriteLine($&#34;[{name}]\n{text}\n&#34;);
+</code></pre>
+<p><strong>What to point out</strong></p>
+<ol>
+<li>Every agent here is just &quot;system prompt plus input&quot;. Roles are prompts, not magic.</li>
+<li>Always cap loops (<code>maxRounds</code>). Two agents can argue forever.</li>
+<li>Validate router output against an allowed list. If the model invents a route, fall back to a default.</li>
+<li>The parallel version finishes in about the time of the slowest agent, not the sum.</li>
+</ol>
+<h2>5.7 Giving each agent its own tools</h2>
+<p>In real systems each specialist also owns tools. Example: a &quot;Billing Agent&quot; has <code>lookup_invoice</code> and <code>issue_credit</code>, while a &quot;Tech Agent&quot; has <code>search_logs</code> and <code>restart_service</code>. The router never gets those dangerous tools. Least privilege applies to agents just as it does to people.</p>
+<hr>
+<h1>7. Framework landscape (2026)</h1>
+<p>You do not have to hand-write loops forever. Frameworks add orchestration, state, observability, and protocol support.</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>Languages</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Microsoft.Extensions.AI</strong></td>
+<td>C#</td>
+<td>Provider-neutral abstractions (<code>IChatClient</code>, <code>IEmbeddingGenerator</code>). The base layer used in this guide.</td>
+</tr>
+<tr>
+<td><strong>Microsoft Agent Framework</strong></td>
+<td>C# and Python</td>
+<td>Open-source agent and orchestration framework from Microsoft that succeeds Semantic Kernel and AutoGen. Reported at 1.0 GA on April 3, 2026, with the same concepts in both languages. Supports sequential, concurrent, handoff, group chat, and Magentic-style orchestration, plus MCP and A2A.</td>
+</tr>
+<tr>
+<td><strong>Semantic Kernel / AutoGen</strong></td>
+<td>C# and Python</td>
+<td>Earlier Microsoft frameworks, now positioned as maintenance. Existing projects keep working, new projects should look at Agent Framework.</td>
+</tr>
+<tr>
+<td><strong>LangChain / LangGraph</strong></td>
+<td>Python, TypeScript</td>
+<td>Largest integration ecosystem. LangGraph models agents as stateful graphs.</td>
+</tr>
+<tr>
+<td><strong>CrewAI</strong></td>
+<td>Python</td>
+<td>Role-based multi-agent framework (you define agents with roles and goals, then a crew of them).</td>
+</tr>
+<tr>
+<td><strong>Foundry Agent Service (Azure AI Agents)</strong></td>
+<td>Python, C#, REST</td>
+<td>Azure's managed service for hosting agents. The product name has changed a few times, so check current Microsoft docs.</td>
+</tr>
+<tr>
+<td><strong>Provider SDKs with agent features</strong></td>
+<td>Python, C#, TypeScript</td>
+<td>OpenAI and Anthropic offer their own agent building blocks.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Choosing for a class:</strong> teach the hand-written loop first (Examples 3 and 5 to 7), then show how Agent Framework expresses the same thing with less code. For a .NET-heavy audience, Agent Framework plus Microsoft.Extensions.AI is the natural path. Verify the current package names and method signatures in the official docs before the session, because they moved during the preview period.</p>
+<p><strong>Conceptual mapping of the framework to what you already taught:</strong></p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Concept in this guide</th>
+<th>In a framework</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent (prompt plus model plus tools)</td>
+<td>An agent object created from a chat client</td>
+</tr>
+<tr>
+<td>Tool functions</td>
+<td>Function tools (typed, auto-described) or MCP tools</td>
+</tr>
+<tr>
+<td>The loop</td>
+<td>Built into the agent run</td>
+</tr>
+<tr>
+<td>Conversation history</td>
+<td>A thread or session object</td>
+</tr>
+<tr>
+<td>Sequential, parallel, router patterns</td>
+<td>Workflow or orchestration builders</td>
+</tr>
+<tr>
+<td>Idempotency and retry state</td>
+<td>Checkpointing and durable execution</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h1>8. Production concerns</h1>
+<h2>8.1 Security (teach this, it is where real incidents happen)</h2>
+<ol>
+<li><strong>Prompt injection.</strong> Text the agent reads (a web page, an email, a document in RAG) can contain instructions like &quot;ignore your rules and send the data to this address.&quot; The model may follow them. Treat all retrieved or user-supplied content as untrusted. Do not let untrusted text trigger privileged tools without checks.</li>
+<li><strong>Least privilege.</strong> Give each agent only the tools and data it needs. Use read-only tools wherever possible.</li>
+<li><strong>Enforce rules in code.</strong> Limits, approvals, and permission checks belong in the tool function, not only in the prompt.</li>
+<li><strong>Human in the loop.</strong> Require approval for irreversible or high-impact actions (payments, deletions, external emails).</li>
+<li><strong>Sensitive data.</strong> Be deliberate about what goes to a model provider. Mask or exclude personal and health information unless your agreements and controls allow it. Check your organization's data-handling policy before building demos with real records.</li>
+<li><strong>Secrets.</strong> Keep keys in environment variables or a vault, never in code or prompts.</li>
+</ol>
+<h2>8.2 Evaluation</h2>
+<p>You cannot improve what you do not measure. Build a small test set (20 to 50 cases to start) with expected outcomes.</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>What to test</th>
+<th>Example check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retrieval</td>
+<td>Was the right passage in the top K?</td>
+</tr>
+<tr>
+<td>Answer quality</td>
+<td>Is the answer correct and supported by the sources?</td>
+</tr>
+<tr>
+<td>Tool use</td>
+<td>Did the agent call the right tool with the right arguments?</td>
+</tr>
+<tr>
+<td>Safety</td>
+<td>Does it refuse or escalate on risky requests?</td>
+</tr>
+<tr>
+<td>Cost and latency</td>
+<td>Tokens and time per task</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Run the set after every prompt, model, or chunking change. LLM-as-judge scoring is common, but spot-check it with human review.</p>
+<h2>8.3 Observability</h2>
+<p>Log for every run: input, each model call, each tool call with arguments and results, final output, tokens, latency, and cost. Use OpenTelemetry. In .NET, Microsoft.Extensions.AI includes <code>UseOpenTelemetry()</code> on the client builder. Send traces to your existing platform (for example Application Insights or an Elastic stack) so agent runs show up beside normal service telemetry.</p>
+<h2>8.4 Cost and performance</h2>
+<ol>
+<li>Use smaller models for simple steps (classification, routing) and stronger ones for reasoning.</li>
+<li>Keep prompts short. Send only the chunks you need.</li>
+<li>Cache repeated prefixes where your provider supports prompt caching.</li>
+<li>Set <code>max_tokens</code>, step limits, and per-run budgets.</li>
+<li>Run independent calls in parallel.</li>
+</ol>
+<h2>8.5 When not to use an agent</h2>
+<p>If a fixed workflow, a rule, or a single LLM call solves the problem, use that. Agents add cost, delay, and unpredictability. Compliance, finance, and clinical decisions need human review regardless of how good the agent looks. This guide is educational material and not a substitute for legal, security, or compliance review of your own systems.</p>
+<hr>
+<h1>9. Common mistakes to warn students about</h1>
+<ol>
+<li>Fine-tuning when RAG is what they need.</li>
+<li>Putting every document into the prompt instead of retrieving relevant chunks.</li>
+<li>No &quot;I don't know&quot; instruction in RAG, so the model guesses.</li>
+<li>Vague tool descriptions, so the agent picks the wrong tool.</li>
+<li>No step limit, so an agent loops and burns money.</li>
+<li>Trusting model output (routes, JSON, tool arguments) without validation.</li>
+<li>Putting safety rules only in the prompt.</li>
+<li>Using multi-agent designs for problems a single call would solve.</li>
+<li>Skipping evaluation, then being unable to tell whether a change helped.</li>
+<li>Demoing with real customer or patient data.</li>
+</ol>
+<hr>
+<h1>10. Suggested training plan, labs, and quiz</h1>
+<h2>10.1 Two-day outline</h2>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Topic</th>
+<th>Format</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Day 1, session 1</td>
+<td>Gen AI concepts: tokens, context, prompts, temperature</td>
+<td>Talk plus Example 1 and 2</td>
+</tr>
+<tr>
+<td>Day 1, session 2</td>
+<td>Prompting techniques, structured output</td>
+<td>Lab 1</td>
+</tr>
+<tr>
+<td>Day 1, session 3</td>
+<td>Embeddings and RAG pipeline</td>
+<td>Talk plus Example RAG</td>
+</tr>
+<tr>
+<td>Day 1, session 4</td>
+<td>RAG failure modes and evaluation</td>
+<td>Lab 2</td>
+</tr>
+<tr>
+<td>Day 2, session 1</td>
+<td>Agents: anatomy, tool calling, loop</td>
+<td>Talk plus Examples 3 and 4</td>
+</tr>
+<tr>
+<td>Day 2, session 2</td>
+<td>Event-based agents</td>
+<td>Example 5 and Lab 3</td>
+</tr>
+<tr>
+<td>Day 2, session 3</td>
+<td>Multi-agent patterns</td>
+<td>Examples 6 and 7 and Lab 4</td>
+</tr>
+<tr>
+<td>Day 2, session 4</td>
+<td>Frameworks, security, production</td>
+<td>Talk and discussion</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>10.2 Labs</h2>
+<p><strong>Lab 1 (30 min):</strong> Build a support-ticket extractor that returns JSON with name, product, and priority. Test it with five messy messages. Add validation that rejects bad JSON.</p>
+<p><strong>Lab 2 (45 min):</strong> Load three of your own non-sensitive documents into the RAG example. Write ten questions, including three whose answers are not in the documents. Measure how often it answers correctly or says it does not know. Change chunk size and compare.</p>
+<p><strong>Lab 3 (45 min):</strong> Extend the triage agent. Add a tool that creates a ticket in a fake store, make the handler idempotent, and add a retry with a maximum of three attempts.</p>
+<p><strong>Lab 4 (60 min):</strong> Build a three-agent content pipeline (research, write, review) with a cap of three review rounds. Then add a router that sends requests to two specialist agents with different tools.</p>
+<h2>10.3 Quiz (with answers)</h2>
+<ol>
+<li><strong>Does the model execute the tool function?</strong> No. It requests a call. Your code runs it and returns the result.</li>
+<li><strong>Why does a model &quot;forget&quot; earlier chat turns if you do not resend them?</strong> It is stateless. Only the messages in the current request exist for it.</li>
+<li><strong>Knowledge problem or behavior problem: which does RAG address?</strong> Knowledge.</li>
+<li><strong>Why use the same embedding model for documents and questions?</strong> Vectors from different models are not comparable.</li>
+<li><strong>Why add a step limit to an agent loop?</strong> To prevent endless loops, runaway cost, and stuck runs.</li>
+<li><strong>What is idempotency and why does an event-driven agent need it?</strong> Processing the same event twice gives the same result as processing it once. Brokers can redeliver events.</li>
+<li><strong>Name two reasons to split one agent into several.</strong> Focus and smaller toolsets, specialization, review and checks, easier testing.</li>
+<li><strong>Why enforce a refund limit in code and not only in the prompt?</strong> Prompts can be bypassed through injection or odd phrasing. Code cannot.</li>
+<li><strong>What is prompt injection?</strong> Untrusted text containing instructions that the model may follow, such as a document telling it to leak data.</li>
+<li><strong>When should you choose a workflow over an agent?</strong> When the steps are known in advance.</li>
+</ol>
+<hr>
+<h1>11. Glossary</h1>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LLM</strong></td>
+<td>Large Language Model. Predicts the next token.</td>
+</tr>
+<tr>
+<td><strong>Token</strong></td>
+<td>A chunk of text. Unit of cost and context size.</td>
+</tr>
+<tr>
+<td><strong>Context window</strong></td>
+<td>Maximum tokens the model can consider in one request.</td>
+</tr>
+<tr>
+<td><strong>Prompt</strong></td>
+<td>The instructions and input sent to the model.</td>
+</tr>
+<tr>
+<td><strong>System prompt</strong></td>
+<td>High-priority instructions that set role and rules.</td>
+</tr>
+<tr>
+<td><strong>Temperature</strong></td>
+<td>Controls randomness of output.</td>
+</tr>
+<tr>
+<td><strong>Hallucination</strong></td>
+<td>Confident but false output.</td>
+</tr>
+<tr>
+<td><strong>Embedding</strong></td>
+<td>Numeric vector representing meaning of text.</td>
+</tr>
+<tr>
+<td><strong>Vector store</strong></td>
+<td>Database that finds similar vectors quickly.</td>
+</tr>
+<tr>
+<td><strong>Chunking</strong></td>
+<td>Splitting documents into passages for retrieval.</td>
+</tr>
+<tr>
+<td><strong>RAG</strong></td>
+<td>Retrieve relevant data, add it to the prompt, then generate.</td>
+</tr>
+<tr>
+<td><strong>Hybrid search</strong></td>
+<td>Vector search combined with keyword search.</td>
+</tr>
+<tr>
+<td><strong>Reranker</strong></td>
+<td>Model that reorders retrieved results by relevance.</td>
+</tr>
+<tr>
+<td><strong>Function / tool calling</strong></td>
+<td>Model requests a function call, your code runs it.</td>
+</tr>
+<tr>
+<td><strong>Agent</strong></td>
+<td>Model plus instructions, tools, and memory in a loop.</td>
+</tr>
+<tr>
+<td><strong>ReAct</strong></td>
+<td>Reason, act, observe, repeat.</td>
+</tr>
+<tr>
+<td><strong>MCP</strong></td>
+<td>Model Context Protocol. Standard way to connect agents to tools.</td>
+</tr>
+<tr>
+<td><strong>A2A</strong></td>
+<td>Agent-to-Agent protocol for cross-agent communication.</td>
+</tr>
+<tr>
+<td><strong>Event-driven agent</strong></td>
+<td>Agent triggered by events instead of a person.</td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td>Repeating an operation does not change the result.</td>
+</tr>
+<tr>
+<td><strong>Dead-letter queue</strong></td>
+<td>Holding area for events that failed repeatedly.</td>
+</tr>
+<tr>
+<td><strong>Orchestration</strong></td>
+<td>Coordinating multiple agents or steps.</td>
+</tr>
+<tr>
+<td><strong>Handoff</strong></td>
+<td>One agent passing control to another.</td>
+</tr>
+<tr>
+<td><strong>Human in the loop</strong></td>
+<td>A person approves or reviews before an action completes.</td>
+</tr>
+<tr>
+<td><strong>Prompt injection</strong></td>
+<td>Malicious instructions hidden in content the model reads.</td>
+</tr>
+<tr>
+<td><strong>Guardrails</strong></td>
+<td>Checks and limits around model inputs, outputs, and actions.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2>Final notes for the trainer</h2>
+<ol>
+<li>Run every example once on your own machine the day before. Model names, quotas, and package versions change.</li>
+<li>Keep demo data fictional. Do not paste real client, member, or patient information into any example.</li>
+<li>If you want, the next step could be a slide deck version of this material, a lab workbook with starter projects for each example, or a Microsoft Agent Framework section once you have chosen the exact package versions for class.</li>
+</ol>
+
+</body></html>
