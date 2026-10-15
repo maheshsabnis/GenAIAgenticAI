@@ -2,7 +2,8 @@
 </head><body>
 <h1>Generative AI and Agentic AI: Trainer's Tutorial (C# and Python)</h1>
 <p>This guide is written for a trainer. <strong>New to all of this? Start with Part 0</strong>, which explains everything from zero in plain words before any heavy code. Each topic has a plain definition, the reason it exists, a point-by-point explanation, working code in Python and C#, and a short <strong>Trainer tip</strong> you can use while teaching.</p>
-<p><strong>Draft notice:</strong> Library APIs in this space change quickly. The code below uses the stable, lower-level layers (the <code>openai</code> Python SDK and Microsoft.Extensions.AI for C#) so it should survive version changes. Microsoft Agent Framework is covered conceptually. Check exact method names against current docs before class.</p>
+<p><strong>Draft notice:</strong> Library APIs in this space change quickly. The Python code uses the stable, lower-level <code>openai</code> SDK. The C# code uses <strong>Microsoft Agent Framework</strong> (<code>Microsoft.Agents.AI</code>), Microsoft's current agent SDK and the successor to Semantic Kernel and AutoGen. The C# snippets were checked against the Microsoft Learn docs as of October 2026. Verify method names and package versions again before class, because this API is still moving (for example, the agent factory method was named <code>CreateAIAgent</code> in earlier previews and is <code>AsAIAgent</code> in the current docs; both may be present in your package version).</p>
+<p><strong>One honest caveat about the C# packages.</strong> <code>Microsoft.Agents.AI</code> is built on top of <code>Microsoft.Extensions.AI</code> and takes a hard dependency on it. You will not write any <code>IChatClient</code> or <code>ChatClientBuilder</code> plumbing in this guide, but a few shared primitives still come from the <code>Microsoft.Extensions.AI.Abstractions</code> package that Agent Framework pulls in: <code>AIFunctionFactory</code> (turns a C# method into a tool), <code>ChatMessage</code> and <code>ChatRole</code> (message types), and <code>ChatOptions</code> (temperature, response format). That is by design and there is no way around it. Everything you build against is the agent layer: <code>AIAgent</code>, <code>AgentSession</code>, <code>AgentResponse</code>, and workflows.</p>
 <hr>
 <h2>Contents</h2>
 <ol>
@@ -27,11 +28,46 @@ export OPENAI_API_KEY=&#34;your-key&#34;
 <p><strong>C# (.NET 8 or later)</strong></p>
 <pre><code class="language-bash">dotnet new console -n GenAiDemo
 cd GenAiDemo
-dotnet add package Microsoft.Extensions.AI
-dotnet add package Microsoft.Extensions.AI.OpenAI
+
+# Agent Framework core plus the OpenAI provider
+dotnet add package Microsoft.Agents.AI.OpenAI --prerelease
+
+# Multi-agent orchestration (Part 5)
+dotnet add package Microsoft.Agents.AI.Workflows --prerelease
+
+# Cosine similarity for the RAG example
 dotnet add package System.Numerics.Tensors
 </code></pre>
-<p>The examples use an OpenAI-compatible endpoint and the model name <code>gpt-4o-mini</code>. You can swap in Azure OpenAI, Claude (through its own SDK), or a local model without changing the concepts. Only the client creation line changes.</p>
+<p><code>Microsoft.Agents.AI.OpenAI</code> brings in <code>Microsoft.Agents.AI</code>, the OpenAI .NET SDK, and <code>Microsoft.Extensions.AI.Abstractions</code> transitively, so you do not add those by hand.</p>
+<p>The examples use an OpenAI endpoint and the model name <code>gpt-4o-mini</code>. Only the two client-creation lines change for other providers:</p>
+<div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Package</th>
+<th>How you get the agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OpenAI (used here)</td>
+<td><code>Microsoft.Agents.AI.OpenAI</code></td>
+<td><code>new OpenAIClient(key).GetChatClient(model).AsAIAgent(...)</code></td>
+</tr>
+<tr>
+<td>Azure OpenAI</td>
+<td><code>Microsoft.Agents.AI.OpenAI</code></td>
+<td><code>new AzureOpenAIClient(uri, credential).GetChatClient(deployment).AsAIAgent(...)</code></td>
+</tr>
+<tr>
+<td>Microsoft Foundry</td>
+<td><code>Microsoft.Agents.AI.Foundry</code></td>
+<td><code>new AIProjectClient(uri, credential).AsAIAgent(model: ..., instructions: ...)</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Everything after that line is identical, which is the point of the <code>AIAgent</code> abstraction.</p>
 <p><strong>Trainer tip:</strong> Put the API key in an environment variable before class and never type it on screen. It is the most common accidental leak in workshops.</p>
 <hr>
 <h1>Part 0: Start Here (Beginner Foundations)</h1>
@@ -673,20 +709,16 @@ print(run_agent(&#34;Create an AKS cluster called aks-demo in resource group rg-
 </code></pre>
 <p><strong>C#</strong></p>
 <pre><code class="language-csharp">using System.ComponentModel;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;   // only for AIFunctionFactory, which Agent Framework depends on
 using OpenAI;
-
-IChatClient agent = new ChatClientBuilder(
-        new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
-            .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient())
-    .UseFunctionInvocation(configure: c =&gt; c.MaximumIterationsPerRequest = 10)   // step limit
-    .Build();
 
 // ---- Fake cloud state. Nothing real is created. ----
 var resourceGroups = new HashSet&lt;string&gt;();
 var clusters = new HashSet&lt;string&gt;();
 var deployed = new HashSet&lt;string&gt;();
 
+// ---- The tools: ordinary C# methods. No AI in them. ----
 [Description(&#34;Check that the Azure subscription is enabled.&#34;)]
 string CheckSubscription()
 {
@@ -733,38 +765,41 @@ string VerifyDeployment([Description(&#34;Cluster name&#34;)] string clusterName
     return $&#34;Cluster {clusterName}: {(deployed.Count &gt; 0 ? 3 : 0)} pods running.&#34;;
 }
 
-var options = new ChatOptions
-{
-    Tools =
-    [
-        AIFunctionFactory.Create(CheckSubscription, &#34;check_subscription&#34;),
-        AIFunctionFactory.Create(CreateResourceGroup, &#34;create_resource_group&#34;),
-        AIFunctionFactory.Create(CreateAksCluster, &#34;create_aks_cluster&#34;),
-        AIFunctionFactory.Create(DeployApp, &#34;deploy_app&#34;),
-        AIFunctionFactory.Create(VerifyDeployment, &#34;verify_deployment&#34;)
-    ]
-};
+// ---- The agent: model + instructions + tools. The loop is built in. ----
+AIAgent agent = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsAIAgent(
+        name: &#34;DevOpsAgent&#34;,
+        instructions:
+            &#34;You are a DevOps agent. Work toward the user&#39;s goal step by step using the tools. &#34; +
+            &#34;Check the subscription first. If a tool returns an error, read it and fix the problem. &#34; +
+            &#34;When finished, give a short report of what you did.&#34;,
+        tools:
+        [
+            AIFunctionFactory.Create(CheckSubscription, &#34;check_subscription&#34;),
+            AIFunctionFactory.Create(CreateResourceGroup, &#34;create_resource_group&#34;),
+            AIFunctionFactory.Create(CreateAksCluster, &#34;create_aks_cluster&#34;),
+            AIFunctionFactory.Create(DeployApp, &#34;deploy_app&#34;),
+            AIFunctionFactory.Create(VerifyDeployment, &#34;verify_deployment&#34;)
+        ]);
 
-var messages = new List&lt;ChatMessage&gt;
-{
-    new(ChatRole.System,
-        &#34;You are a DevOps agent. Work toward the user&#39;s goal step by step using the tools. &#34; +
-        &#34;Check the subscription first. If a tool returns an error, read it and fix the problem. &#34; +
-        &#34;When finished, give a short report of what you did.&#34;),
-    new(ChatRole.User,
-        &#34;Create an AKS cluster called aks-demo in resource group rg-demo and deploy image myapp:1.0.&#34;)
-};
+// A wall-clock limit so a confused agent cannot run forever.
+using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
 
-var response = await agent.GetResponseAsync(messages, options);
+AgentResponse response = await agent.RunAsync(
+    &#34;Create an AKS cluster called aks-demo in resource group rg-demo and deploy image myapp:1.0.&#34;,
+    cancellationToken: cts.Token);
+
 Console.WriteLine(response.Text);
 </code></pre>
+<p>Compare the two versions side by side in class. The Python code spells out the loop, the JSON tool schemas, and the message list. The C# code has none of that: <code>AsAIAgent(...)</code> produces an <code>AIAgent</code> that already contains the loop, <code>AIFunctionFactory.Create</code> generates each tool schema from the method signature and its <code>[Description]</code> attributes, and <code>RunAsync</code> returns an <code>AgentResponse</code> after the agent has finished calling tools. Same behaviour, far less code, and nothing hidden that you have not already seen in the Python version.</p>
 <h3>How to read this code (line by line for beginners)</h3>
 <ol>
 <li><strong>The tool functions</strong> are ordinary code. They have no AI in them.</li>
 <li><strong>The tool descriptions</strong> (the <code>tool(...)</code> helper in Python, <code>[Description]</code> in C#) are what the model reads to decide which tool to use. Clear descriptions mean better decisions.</li>
 <li><strong>The system prompt</strong> is the agent's job description: its role, its rules, and when it is done.</li>
-<li><strong>The loop</strong> (explicit in Python, hidden inside <code>UseFunctionInvocation()</code> in C#) repeats: ask the model, run any tools it requested, send the results back, repeat.</li>
-<li><strong>The step limit</strong> (<code>max_steps</code>, <code>MaximumIterationsPerRequest</code>) stops a confused agent from looping forever.</li>
+<li><strong>The loop</strong> (explicit in Python, built into the <code>AIAgent</code> in C#) repeats: ask the model, run any tools it requested, send the results back, repeat.</li>
+<li><strong>The limits.</strong> Python caps the number of steps with <code>max_steps</code>. The C# version uses a <code>CancellationTokenSource</code> as a wall-clock cap. Agent Framework also has a real iteration cap, <code>MaximumIterationsPerRequest</code>, shown in Part 3.6. Use at least one of these in anything you run unattended.</li>
 <li><strong>The <code>ACT</code> and <code>OBSERVE</code> lines</strong> let you watch the agent work. Compare them to the Reason, Act, Observe diagram in 0.3.</li>
 </ol>
 <h3>Try these experiments</h3>
@@ -893,29 +928,42 @@ print(response.choices[0].message.content)
 print(&#34;Tokens used:&#34;, response.usage.total_tokens)
 </code></pre>
 <p><strong>C#</strong></p>
-<pre><code class="language-csharp">using Microsoft.Extensions.AI;
+<pre><code class="language-csharp">using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;   // ChatOptions and ChatClientAgentRunOptions inputs
 using OpenAI;
 
-IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+AIAgent assistant = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
     .GetChatClient(&#34;gpt-4o-mini&#34;)
-    .AsIChatClient();
+    .AsAIAgent(
+        name: &#34;HealthcareItAssistant&#34;,
+        instructions: &#34;You are a concise assistant for a healthcare IT team.&#34;);
 
-var messages = new List&lt;ChatMessage&gt;
-{
-    new(ChatRole.System, &#34;You are a concise assistant for a healthcare IT team.&#34;),
-    new(ChatRole.User, &#34;Explain what an API gateway does in 3 sentences.&#34;)
-};
-
-var response = await client.GetResponseAsync(messages, new ChatOptions { Temperature = 0.2f });
+AgentResponse response = await assistant.RunAsync(
+    &#34;Explain what an API gateway does in 3 sentences.&#34;,
+    options: new ChatClientAgentRunOptions(new ChatOptions { Temperature = 0.2f }));
 
 Console.WriteLine(response.Text);
-Console.WriteLine($&#34;Tokens used: {response.Usage?.TotalTokenCount}&#34;);
+Console.WriteLine($&#34;Messages produced: {response.Messages.Count}&#34;);
+</code></pre>
+<p>The system prompt is no longer a message you assemble by hand. It is the agent's <code>instructions</code>, set once when the agent is created, and Agent Framework sends it on every run.</p>
+<p><strong>Multi-turn conversation.</strong> The model is still stateless, but Agent Framework gives you an object that holds the history for you: an <code>AgentSession</code>.</p>
+<pre><code class="language-csharp">AgentSession session = await assistant.CreateSessionAsync();
+
+await assistant.RunAsync(&#34;What is an API gateway?&#34;, session);
+var followUp = await assistant.RunAsync(&#34;Give me an Azure example of one.&#34;, session);
+
+Console.WriteLine(followUp.Text);   // it knows &#34;one&#34; means an API gateway
+
+// Persist the conversation and resume it later (a web app would store this per user)
+var saved = assistant.SerializeSession(session);
+AgentSession resumed = await assistant.DeserializeSessionAsync(saved);
 </code></pre>
 <p><strong>What to point out to students</strong></p>
 <ol>
-<li>The model is stateless. Each call carries the full message list.</li>
-<li><code>IChatClient</code> in C# is a provider-neutral interface. Swap OpenAI for Azure OpenAI or a local model by changing only the line that creates the client. (In older Microsoft.Extensions.AI.OpenAI versions the method is called <code>AsChatClient</code>. It was renamed <code>AsIChatClient</code>.)</li>
-<li>Show <code>usage</code> early. Tokens equal money.</li>
+<li>The model is still stateless. <code>AgentSession</code> is your code keeping the history and resending it, not the model remembering. Run the second example without the <code>session</code> argument and watch the follow-up question fail.</li>
+<li><code>AIAgent</code> is provider-neutral. Swap OpenAI for Azure OpenAI, Microsoft Foundry, or a local model by changing only the client-creation line. Everything below it is unchanged.</li>
+<li>Token usage is reported per run on the response (check <code>response.Usage</code> in your package version, or enable OpenTelemetry as in Part 8.3, which records tokens for every agent run). Show it early. Tokens equal money.</li>
+<li>A note on naming: the current docs use <code>AsAIAgent(...)</code>. Earlier preview packages called the same thing <code>CreateAIAgent(...)</code>, and older samples used <code>AgentThread</code> where the current API uses <code>AgentSession</code>. If an example from a blog post does not compile, this is usually why.</li>
 </ol>
 <h2>1.5 Example 2: Streaming and structured output</h2>
 <p>Streaming shows tokens as they arrive, which makes apps feel faster.</p>
@@ -931,11 +979,12 @@ for chunk in stream:
         print(delta, end=&#34;&#34;, flush=True)
 </code></pre>
 <p><strong>C#</strong></p>
-<pre><code class="language-csharp">await foreach (var update in client.GetStreamingResponseAsync(&#34;Write a haiku about audit logs.&#34;))
+<pre><code class="language-csharp">await foreach (AgentResponseUpdate update in assistant.RunStreamingAsync(&#34;Write a haiku about audit logs.&#34;))
 {
     Console.Write(update.Text);
 }
 </code></pre>
+<p>Each <code>AgentResponseUpdate</code> may carry more than text. <code>update.Contents</code> also surfaces tool calls and tool results as they happen, which is how you build a live &quot;the agent is now searching...&quot; display in a real UI.</p>
 <p>Structured output means asking for JSON so your code can parse it. Always validate the result, because the model can still return malformed data.</p>
 <p><strong>Python</strong></p>
 <pre><code class="language-python">import json
@@ -954,19 +1003,31 @@ print(data)
 </code></pre>
 <p><strong>C#</strong></p>
 <pre><code class="language-csharp">using System.Text.Json;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using OpenAI;
 
-var resp = await client.GetResponseAsync(
-    new[]
-    {
-        new ChatMessage(ChatRole.System, &#34;Extract fields. Reply with JSON only: {\&#34;name\&#34;: string, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;),
-        new ChatMessage(ChatRole.User, &#34;Urgent: Maria Lopez cannot access the claims portal.&#34;)
-    },
-    new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
+record TicketInfo(string Name, string Priority);
 
-var doc = JsonDocument.Parse(resp.Text);
-Console.WriteLine(doc.RootElement.GetProperty(&#34;priority&#34;).GetString());
+AIAgent extractor = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsAIAgent(
+        name: &#34;FieldExtractor&#34;,
+        instructions: &#34;Extract fields. Reply with JSON only: {\&#34;name\&#34;: string, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;);
+
+AgentResponse resp = await extractor.RunAsync(
+    &#34;Urgent: Maria Lopez cannot access the claims portal.&#34;,
+    options: new ChatClientAgentRunOptions(
+        new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json }));
+
+var ticket = JsonSerializer.Deserialize&lt;TicketInfo&gt;(
+    resp.Text,
+    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+Console.WriteLine($&#34;{ticket?.Name} / {ticket?.Priority}&#34;);
 </code></pre>
-<p>C# also supports strongly typed results through <code>GetResponseAsync&lt;T&gt;(...)</code> in Microsoft.Extensions.AI, which deserializes into your own class. Show it once students are comfortable with the raw JSON version.</p>
+<p>Two things worth saying out loud here. First, <code>ChatClientAgentRunOptions</code> is how you pass model settings (temperature, response format, token limits) to an agent for a single run. The agent is a <code>ChatClientAgent</code> under the hood, and these options are merged with whatever was set when the agent was created. Second, JSON mode makes the output <em>parseable</em>, not <em>correct</em>. Keep the <code>try/catch</code> around the deserialize and validate the values, because <code>&quot;priority&quot;</code> can still come back as something that is not one of your three allowed words.</p>
+<p>Agent Framework also supports schema-constrained responses and typed deserialization helpers on the response object. Those move faster than the rest of the API, so check the current docs and show them once students are comfortable with the raw JSON version above.</p>
 <hr>
 <h1>Part 2: RAG (Retrieval-Augmented Generation)</h1>
 <h2>2.1 Definition</h2>
@@ -1053,13 +1114,26 @@ print(answer(&#34;What is the dress code?&#34;))   # should say it does not know
 </code></pre>
 <p><strong>C#</strong></p>
 <pre><code class="language-csharp">using System.Numerics.Tensors;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;   // ChatOptions
 using OpenAI;
+using OpenAI.Embeddings;
 
 var openAi = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!);
-IChatClient chat = openAi.GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
-IEmbeddingGenerator&lt;string, Embedding&lt;float&gt;&gt; embedder =
-    openAi.GetEmbeddingClient(&#34;text-embedding-3-small&#34;).AsIEmbeddingGenerator();
+
+// The answering agent. Its instructions are the grounding rule.
+AIAgent rag = openAi.GetChatClient(&#34;gpt-4o-mini&#34;).AsAIAgent(
+    name: &#34;PolicyAssistant&#34;,
+    instructions:
+        &#34;Answer using ONLY the context provided in the question. &#34; +
+        &#34;If the answer is not in the context, say you do not know. &#34; +
+        &#34;Cite the source name in square brackets.&#34;);
+
+// Temperature 0: grounded answers should not vary between runs.
+var groundedOptions = new ChatClientAgentRunOptions(new ChatOptions { Temperature = 0 });
+
+// Embeddings are not an agent concern, so we use the OpenAI SDK client directly.
+EmbeddingClient embedder = openAi.GetEmbeddingClient(&#34;text-embedding-3-small&#34;);
 
 var documents = new Dictionary&lt;string, string&gt;
 {
@@ -1071,35 +1145,33 @@ var documents = new Dictionary&lt;string, string&gt;
 // ---- Indexing ----
 var sources = documents.Keys.ToList();
 var texts   = documents.Values.ToList();
-var vectors = await embedder.GenerateAsync(texts);   // one embedding per text
+
+var embedResult = await embedder.GenerateEmbeddingsAsync(texts);
+var vectors = embedResult.Value.Select(e =&gt; e.ToFloats()).ToList();   // one vector per text
 
 // ---- Query ----
 async Task&lt;string&gt; AnswerAsync(string question, int k = 2)
 {
-    var q = (await embedder.GenerateAsync(new[] { question }))[0].Vector;
+    var qResult = await embedder.GenerateEmbeddingsAsync(new[] { question });
+    var q = qResult.Value[0].ToFloats();
 
     var top = vectors
-        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Vector.Span)))
+        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Span)))
         .OrderByDescending(x =&gt; x.Score)
         .Take(k)
         .ToList();
 
     var context = string.Join(&#34;\n\n&#34;, top.Select(t =&gt; $&#34;[{sources[t.Index]}] {texts[t.Index]}&#34;));
 
-    var messages = new List&lt;ChatMessage&gt;
-    {
-        new(ChatRole.System,
-            &#34;Answer using ONLY the context below. If the answer is not in the context, say you do not know. Cite the source name in square brackets.&#34;),
-        new(ChatRole.User, $&#34;Context:\n{context}\n\nQuestion: {question}&#34;)
-    };
-
-    var response = await chat.GetResponseAsync(messages, new ChatOptions { Temperature = 0 });
+    var response = await rag.RunAsync($&#34;Context:\n{context}\n\nQuestion: {question}&#34;, options: groundedOptions);
     return response.Text;
 }
 
 Console.WriteLine(await AnswerAsync(&#34;How many days can I work from home?&#34;));
 Console.WriteLine(await AnswerAsync(&#34;What is the dress code?&#34;));
 </code></pre>
+<p>Note what moved. The grounding rule (&quot;answer only from the context&quot;) is now the agent's <code>instructions</code>, written once. Each call sends only the retrieved context and the question. Note also what did <em>not</em> move: retrieval is still ordinary code that you own. Agent Framework has no opinion about where your vectors live, which is a feature, not a gap.</p>
+<p>Each question is answered in its own run with no <code>AgentSession</code>, so nothing carries over between them. That is deliberate for a plain question-and-answer box. If you want follow-up questions (&quot;and what about contractors?&quot;) to work, create one session per user and pass it to every <code>RunAsync</code> call, as in Part 1.4.</p>
 <p><strong>What to point out</strong></p>
 <ol>
 <li>The second question (dress code) is the best teaching moment. A correct RAG system admits it does not know. Remove the &quot;ONLY the context&quot; instruction and watch the model invent an answer.</li>
@@ -1327,19 +1399,12 @@ def run_agent(goal: str, max_steps: int = 6) -&gt; str:
 
 print(run_agent(&#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;))
 </code></pre>
-<h2>3.6 Example 4: The same agent in C# with Microsoft.Extensions.AI</h2>
-<p>In C#, <code>UseFunctionInvocation()</code> adds the loop for you. It detects tool requests, calls your .NET methods, sends the results back, and repeats.</p>
+<h2>3.6 Example 4: The same agent in C# with Microsoft Agent Framework</h2>
+<p>In C#, an <code>AIAgent</code> contains the loop. It detects tool requests, calls your .NET methods, sends the results back, and repeats, until the model stops asking for tools.</p>
 <pre><code class="language-csharp">using System.ComponentModel;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;   // AIFunctionFactory, ChatOptions
 using OpenAI;
-
-IChatClient baseClient = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
-    .GetChatClient(&#34;gpt-4o-mini&#34;)
-    .AsIChatClient();
-
-IChatClient agent = new ChatClientBuilder(baseClient)
-    .UseFunctionInvocation()        // this is the agent loop
-    .Build();
 
 var orders = new Dictionary&lt;string, (string Status, string Promised, string? Delivered)&gt;
 {
@@ -1354,36 +1419,62 @@ string GetOrderStatus([Description(&#34;Order id such as A-1001&#34;)] string or
         : &#34;Order not found&#34;;
 
 [Description(&#34;Refund a customer. Only use after confirming the order was late.&#34;)]
-string IssueRefund(string orderId, double amount) =&gt;
+string IssueRefund(
+    [Description(&#34;Order id such as A-1001&#34;)] string orderId,
+    [Description(&#34;Amount in USD&#34;)] double amount) =&gt;
     amount &gt; 50
         ? &#34;Error: amount above limit, needs human approval.&#34;
         : $&#34;Refunded {amount} USD for {orderId}&#34;;
 
-var options = new ChatOptions
-{
-    Tools =
-    [
-        AIFunctionFactory.Create(GetOrderStatus, &#34;get_order_status&#34;),
-        AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;)
-    ]
-};
+AIAgent agent = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsAIAgent(
+        name: &#34;SupportAgent&#34;,
+        instructions:
+            &#34;You are a customer support agent. Check order facts with tools before answering. &#34; +
+            &#34;Never promise a refund without confirming the order was delivered late. Be brief and polite.&#34;,
+        tools:
+        [
+            AIFunctionFactory.Create(GetOrderStatus, &#34;get_order_status&#34;),
+            AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;)
+        ]);
 
-var messages = new List&lt;ChatMessage&gt;
-{
-    new(ChatRole.System,
-        &#34;You are a customer support agent. Check order facts with tools before answering. &#34; +
-        &#34;Never promise a refund without confirming the order was delivered late. Be brief and polite.&#34;),
-    new(ChatRole.User, &#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;)
-};
-
-var response = await agent.GetResponseAsync(messages, options);
+AgentResponse response = await agent.RunAsync(&#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;);
 Console.WriteLine(response.Text);
 </code></pre>
+<p><strong>Capping the loop.</strong> The example above has no iteration limit. For anything running unattended, build the agent through the harness instead, which pre-configures the function-invocation pipeline and exposes a real cap:</p>
+<pre><code class="language-csharp">AIAgent agent = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsHarnessAgent(new HarnessAgentOptions
+    {
+        MaximumIterationsPerRequest = 6,   // the step limit, enforced in code
+        DisableWebSearch = true,           // only the tools listed below, nothing hosted
+        ChatOptions = new ChatOptions
+        {
+            Instructions = &#34;You are a customer support agent. Check order facts with tools before answering. &#34; +
+                           &#34;Never promise a refund without confirming the order was delivered late. Be brief and polite.&#34;,
+            Tools =
+            [
+                AIFunctionFactory.Create(GetOrderStatus, &#34;get_order_status&#34;),
+                AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;)
+            ]
+        }
+    });
+
+AgentSession session = await agent.CreateSessionAsync();
+AgentResponse response = await agent.RunAsync(&#34;My order A-1001 arrived late. Can I get a 10 dollar refund?&#34;, session);
+Console.WriteLine(response.Text);
+</code></pre>
+<p><strong>Human approval for risky tools.</strong> Wrapping a tool in <code>ApprovalRequiredAIFunction</code> makes the framework pause and ask before it runs, instead of relying on the prompt to hold the line:</p>
+<pre><code class="language-csharp">new ApprovalRequiredAIFunction(AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;))
+</code></pre>
+<p>Your code then receives an approval request it must answer before the refund executes. Part 5 shows how this surfaces inside a workflow as a <code>RequestInfoEvent</code>.</p>
 <p><strong>What to point out</strong></p>
 <ol>
-<li>Python version: you wrote the loop and the JSON schema. C# version: the framework builds the schema from the method signature and <code>[Description]</code> attributes and runs the loop. Same behavior, less code.</li>
-<li>The refund limit lives in code, not only in the prompt. Prompts can be talked around. Code cannot.</li>
+<li>Python version: you wrote the loop and the JSON schema by hand. C# version: <code>AIFunctionFactory</code> builds the schema from the method signature and the <code>[Description]</code> attributes, and the <code>AIAgent</code> runs the loop. Same behavior, less code, nothing conceptually new.</li>
+<li>The refund limit lives in code, not only in the prompt. Prompts can be talked around. Code cannot. <code>ApprovalRequiredAIFunction</code> is the framework's version of the same principle.</li>
 <li>Run it with <code>A-1002</code> (not yet delivered) and show the agent declining to refund.</li>
+<li>Set <code>MaximumIterationsPerRequest = 1</code> and watch a task that needs two tool calls fail. That is the lesson about step limits, learned the memorable way.</li>
 </ol>
 <h2>3.7 Agentic RAG</h2>
 <p>Turn retrieval into a tool. Instead of always retrieving once, the agent decides whether to search, what query to use, and whether to search again if the first results were weak.</p>
@@ -1407,17 +1498,30 @@ TOOLS.append({
 </code></pre>
 <p><strong>C#</strong></p>
 <pre><code class="language-csharp">[Description(&#34;Search company policy documents. Use for any policy question.&#34;)]
-async Task&lt;string&gt; SearchPolicies(string query)
+async Task&lt;string&gt; SearchPolicies([Description(&#34;What to search for&#34;)] string query)
 {
-    var q = (await embedder.GenerateAsync(new[] { query }))[0].Vector;
+    var qResult = await embedder.GenerateEmbeddingsAsync(new[] { query });
+    var q = qResult.Value[0].ToFloats();
+
     var top = vectors
-        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Vector.Span)))
+        .Select((v, i) =&gt; (Index: i, Score: TensorPrimitives.CosineSimilarity(q.Span, v.Span)))
         .OrderByDescending(x =&gt; x.Score).Take(3);
+
     return string.Join(&#34;\n&#34;, top.Select(t =&gt; $&#34;[{sources[t.Index]}] {texts[t.Index]}&#34;));
 }
 
-options.Tools!.Add(AIFunctionFactory.Create(SearchPolicies, &#34;search_policies&#34;));
+// Retrieval is now just another tool in the agent's list.
+AIAgent supportAgent = openAi.GetChatClient(&#34;gpt-4o-mini&#34;).AsAIAgent(
+    name: &#34;SupportAgent&#34;,
+    instructions: &#34;Answer support questions. Search the policy documents before answering any policy question. Cite sources.&#34;,
+    tools:
+    [
+        AIFunctionFactory.Create(GetOrderStatus, &#34;get_order_status&#34;),
+        AIFunctionFactory.Create(IssueRefund, &#34;issue_refund&#34;),
+        AIFunctionFactory.Create(SearchPolicies, &#34;search_policies&#34;)
+    ]);
 </code></pre>
+<p>That single change is the whole idea of agentic RAG. In Part 2 your code decided to retrieve, once, every time. Here the agent decides whether to search at all, what query to use, and whether the first results were good enough to answer from or it should search again with different words.</p>
 <h2>3.8 Model Context Protocol (MCP) and tools at scale</h2>
 <p>Writing every tool by hand does not scale. <strong>MCP</strong> is an open protocol that lets an agent connect to external tool servers (for example a work-item system, a log platform, or a database) through one standard interface. Tools are discovered at runtime instead of being hard-coded. Both Python and C# have MCP client libraries, and Microsoft Agent Framework supports MCP.</p>
 <p>The related <strong>A2A (Agent-to-Agent)</strong> protocol covers one agent calling another agent across systems. For a first course, mention both and focus on plain tool calling.</p>
@@ -1531,11 +1635,20 @@ asyncio.run(main())
 <h2>4.5 The same pattern in C# with <code>Channel&lt;T&gt;</code></h2>
 <pre><code class="language-csharp">using System.Text.Json;
 using System.Threading.Channels;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;   // ChatOptions, ChatResponseFormat
 using OpenAI;
 
-IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
-    .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
+// One agent, created once, reused for every event. Agents are thread-safe to run concurrently;
+// conversation state lives in the session, and here each event is independent so we use none.
+AIAgent triageAgent = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
+    .GetChatClient(&#34;gpt-4o-mini&#34;)
+    .AsAIAgent(
+        name: &#34;TicketTriage&#34;,
+        instructions: &#34;You triage IT tickets. Reply JSON only: {\&#34;category\&#34;: \&#34;access|bug|request|outage\&#34;, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;);
+
+var runOptions = new ChatClientAgentRunOptions(
+    new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
 
 var processed = new HashSet&lt;string&gt;();               // production: a database table
 var channel = Channel.CreateBounded&lt;TicketEvent&gt;(100);   // bounded = built-in back pressure
@@ -1549,14 +1662,7 @@ var consumer = Task.Run(async () =&gt;
 
         try
         {
-            var response = await client.GetResponseAsync(
-                new[]
-                {
-                    new ChatMessage(ChatRole.System,
-                        &#34;You triage IT tickets. Reply JSON only: {\&#34;category\&#34;: \&#34;access|bug|request|outage\&#34;, \&#34;priority\&#34;: \&#34;low|medium|high\&#34;}&#34;),
-                    new ChatMessage(ChatRole.User, evt.Text)
-                },
-                new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
+            AgentResponse response = await triageAgent.RunAsync(evt.Text, options: runOptions);
 
             var json = JsonDocument.Parse(response.Text).RootElement;
             var priority = json.GetProperty(&#34;priority&#34;).GetString();
@@ -1757,85 +1863,137 @@ async def main():
 
 asyncio.run(main())
 </code></pre>
-<h2>5.6 The same ideas in C#</h2>
+<h2>5.6 The same ideas in C# with Agent Framework workflows</h2>
+<p>This is where Agent Framework earns its keep. The <code>Microsoft.Agents.AI.Workflows</code> package has builders for the patterns in the table above, so you stop hand-wiring agents together.</p>
+<p><strong>Shared setup: three agents, each one a role.</strong></p>
 <pre><code class="language-csharp">using System.Text.Json;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.AI;   // ChatMessage, ChatRole, ChatOptions
 using OpenAI;
 
-IChatClient client = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!)
-    .GetChatClient(&#34;gpt-4o-mini&#34;).AsIChatClient();
+var openAi = new OpenAIClient(Environment.GetEnvironmentVariable(&#34;OPENAI_API_KEY&#34;)!);
 
-async Task&lt;string&gt; Ask(string system, string user, bool json = false, float temperature = 0f)
+AIAgent Agent(string name, string instructions) =&gt;
+    openAi.GetChatClient(&#34;gpt-4o-mini&#34;).AsAIAgent(name: name, instructions: instructions);
+
+var researcher = Agent(&#34;Researcher&#34;,
+    &#34;You are a researcher. List 5 key facts about the topic as short bullet points. No opinions.&#34;);
+var writer = Agent(&#34;Writer&#34;,
+    &#34;You are a writer. Turn the facts into a 120 word explainer for non-technical staff. Plain language.&#34;);
+var reviewer = Agent(&#34;Reviewer&#34;,
+    &#34;You are a strict reviewer. If the draft is accurate and clear reply exactly: APPROVED. Otherwise list the problems.&#34;);
+</code></pre>
+<p><strong>Sequential (pipeline).</strong> One builder call replaces the hand-written chain. Each agent receives the conversation so far and adds its response.</p>
+<pre><code class="language-csharp">var workflow = AgentWorkflowBuilder.BuildSequential([researcher, writer, reviewer]);
+
+var input = new List&lt;ChatMessage&gt; { new(ChatRole.User, &#34;Topic: What is a vector database?&#34;) };
+
+await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, input);
+await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
+
+List&lt;ChatMessage&gt; result = [];
+string? lastExecutor = null;
+
+await foreach (WorkflowEvent evt in run.WatchStreamAsync())
 {
-    var options = new ChatOptions { Temperature = temperature };
-    if (json) options.ResponseFormat = ChatResponseFormat.Json;
-    var r = await client.GetResponseAsync(
-        new[] { new ChatMessage(ChatRole.System, system), new ChatMessage(ChatRole.User, user) }, options);
-    return r.Text;
+    if (evt is AgentResponseUpdateEvent update)
+    {
+        if (update.ExecutorId != lastExecutor)            // a new agent started speaking
+        {
+            lastExecutor = update.ExecutorId;
+            Console.WriteLine();
+            Console.Write($&#34;{update.ExecutorId}: &#34;);
+        }
+        Console.Write(update.Update.Text);                // live token stream
+    }
+    else if (evt is WorkflowOutputEvent output)
+    {
+        result = output.As&lt;List&lt;ChatMessage&gt;&gt;()!;         // the finished conversation
+        break;
+    }
 }
+</code></pre>
+<p><strong>Concurrent (fan-out, fan-in).</strong> Same shape, different builder. The three reviewers run at the same time and the framework merges their results.</p>
+<pre><code class="language-csharp">var security   = Agent(&#34;Security&#34;,   &#34;Review for security risks. 3 bullets max.&#34;);
+var compliance = Agent(&#34;Compliance&#34;, &#34;Review for compliance and privacy concerns. 3 bullets max.&#34;);
+var clarity    = Agent(&#34;Clarity&#34;,    &#34;Review for clarity and ambiguity. 3 bullets max.&#34;);
 
-// ---- Sequential with review loop ----
-const string Researcher = &#34;You are a researcher. List 5 key facts about the topic as short bullet points. No opinions.&#34;;
-const string Writer     = &#34;You are a writer. Turn the facts into a 120 word explainer for non-technical staff. Plain language.&#34;;
-const string Reviewer   = &#34;You are a strict reviewer. If the draft is accurate and clear reply exactly: APPROVED. Otherwise list the problems.&#34;;
+var panel = AgentWorkflowBuilder.BuildConcurrent([security, compliance, clarity]);
 
-async Task&lt;string&gt; RunPipeline(string topic, int maxRounds = 3)
+var document = new List&lt;ChatMessage&gt;
 {
-    var facts = await Ask(Researcher, $&#34;Topic: {topic}&#34;);
-    var draft = await Ask(Writer, $&#34;Facts:\n{facts}&#34;, temperature: 0.3f);
+    new(ChatRole.User, &#34;Users upload files and we store them in a public bucket for faster access.&#34;)
+};
+
+await using StreamingRun panelRun = await InProcessExecution.RunStreamingAsync(panel, document);
+await panelRun.TrySendMessageAsync(new TurnToken(emitEvents: true));
+
+await foreach (WorkflowEvent evt in panelRun.WatchStreamAsync())
+{
+    if (evt is WorkflowOutputEvent output)
+    {
+        foreach (var message in output.As&lt;List&lt;ChatMessage&gt;&gt;()!)
+            Console.WriteLine($&#34;[{message.AuthorName}]\n{message.Text}\n&#34;);
+        break;
+    }
+}
+</code></pre>
+<p><strong>The review loop stays your code.</strong> <code>BuildSequential</code> is a one-way pipeline. It cannot send work back to an earlier agent, so the &quot;reviewer rejects the draft, writer tries again&quot; loop from the Python example is written by hand with plain agent calls. Agent Framework offers handoff orchestration and a full <code>WorkflowBuilder</code> graph for cases that genuinely need cycles, but for a capped revision loop this is clearer:</p>
+<pre><code class="language-csharp">async Task&lt;string&gt; RunReviewLoop(string topic, int maxRounds = 3)
+{
+    var facts = (await researcher.RunAsync($&#34;Topic: {topic}&#34;)).Text;
+    var draft = (await writer.RunAsync($&#34;Facts:\n{facts}&#34;)).Text;
 
     for (int round = 1; round &lt;= maxRounds; round++)
     {
-        var review = await Ask(Reviewer, $&#34;Facts:\n{facts}\n\nDraft:\n{draft}&#34;);
+        var review = (await reviewer.RunAsync($&#34;Facts:\n{facts}\n\nDraft:\n{draft}&#34;)).Text;
         Console.WriteLine($&#34;Round {round}: {review[..Math.Min(80, review.Length)]}&#34;);
-        if (review.Trim().StartsWith(&#34;APPROVED&#34;)) return draft;
-        draft = await Ask(Writer, $&#34;Facts:\n{facts}\n\nPrevious draft:\n{draft}\n\nFix these issues:\n{review}&#34;, temperature: 0.3f);
-    }
-    return draft;
-}
 
-// ---- Router ----
-var specialists = new Dictionary&lt;string, string&gt;
+        if (review.TrimStart().StartsWith(&#34;APPROVED&#34;, StringComparison.Ordinal)) return draft;
+
+        draft = (await writer.RunAsync(
+            $&#34;Facts:\n{facts}\n\nPrevious draft:\n{draft}\n\nFix these issues:\n{review}&#34;)).Text;
+    }
+    return draft;   // stop after max rounds even if not approved
+}
+</code></pre>
+<p><strong>Router.</strong> Each specialist is a separate agent with its own instructions, and in a real system its own tools. The router agent has no tools at all.</p>
+<pre><code class="language-csharp">var specialists = new Dictionary&lt;string, AIAgent&gt;
 {
-    [&#34;billing&#34;]   = &#34;You are a billing specialist. Answer clearly and offer next steps.&#34;,
-    [&#34;technical&#34;] = &#34;You are a technical support engineer. Give numbered troubleshooting steps.&#34;,
-    [&#34;general&#34;]   = &#34;You are a friendly general support agent.&#34;
+    [&#34;billing&#34;]   = Agent(&#34;Billing&#34;,   &#34;You are a billing specialist. Answer clearly and offer next steps.&#34;),
+    [&#34;technical&#34;] = Agent(&#34;Technical&#34;, &#34;You are a technical support engineer. Give numbered troubleshooting steps.&#34;),
+    [&#34;general&#34;]   = Agent(&#34;General&#34;,   &#34;You are a friendly general support agent.&#34;)
 };
+
+var router = Agent(&#34;Router&#34;,
+    &#34;Classify the request. Reply JSON only: {\&#34;route\&#34;: \&#34;billing|technical|general\&#34;}&#34;);
+
+var jsonOptions = new ChatClientAgentRunOptions(
+    new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json });
 
 async Task&lt;string&gt; Handle(string question)
 {
-    var routeJson = await Ask(&#34;Classify the request. Reply JSON only: {\&#34;route\&#34;: \&#34;billing|technical|general\&#34;}&#34;, question, json: true);
+    var routeJson = (await router.RunAsync(question, options: jsonOptions)).Text;
     var route = JsonDocument.Parse(routeJson).RootElement.GetProperty(&#34;route&#34;).GetString() ?? &#34;general&#34;;
-    if (!specialists.ContainsKey(route)) route = &#34;general&#34;;      // never trust model output blindly
+
+    if (!specialists.ContainsKey(route)) route = &#34;general&#34;;   // never trust model output blindly
+
     Console.WriteLine($&#34;Routed to: {route}&#34;);
-    return await Ask(specialists[route], question);
+    return (await specialists[route].RunAsync(question)).Text;
 }
 
-// ---- Parallel fan-out / fan-in ----
-async Task&lt;Dictionary&lt;string, string&gt;&gt; ParallelReview(string document)
-{
-    var reviewers = new Dictionary&lt;string, string&gt;
-    {
-        [&#34;security&#34;]   = &#34;Review for security risks. 3 bullets max.&#34;,
-        [&#34;compliance&#34;] = &#34;Review for compliance and privacy concerns. 3 bullets max.&#34;,
-        [&#34;clarity&#34;]    = &#34;Review for clarity and ambiguity. 3 bullets max.&#34;
-    };
-    var tasks = reviewers.ToDictionary(r =&gt; r.Key, r =&gt; Ask(r.Value, document));
-    await Task.WhenAll(tasks.Values);
-    return tasks.ToDictionary(t =&gt; t.Key, t =&gt; t.Value.Result);
-}
-
-Console.WriteLine(await RunPipeline(&#34;What is a vector database?&#34;));
+Console.WriteLine(await RunReviewLoop(&#34;What is a vector database?&#34;));
 Console.WriteLine(await Handle(&#34;I was charged twice for my March invoice.&#34;));
-foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we store them in a public bucket for faster access.&#34;))
-    Console.WriteLine($&#34;[{name}]\n{text}\n&#34;);
 </code></pre>
 <p><strong>What to point out</strong></p>
 <ol>
-<li>Every agent here is just &quot;system prompt plus input&quot;. Roles are prompts, not magic.</li>
-<li>Always cap loops (<code>maxRounds</code>). Two agents can argue forever.</li>
+<li>Every agent here is still &quot;instructions plus input&quot;. Roles are prompts, not magic. The builder only decides who talks to whom.</li>
+<li>Always cap loops (<code>maxRounds</code>). Two agents can argue forever, and each round costs money.</li>
 <li>Validate router output against an allowed list. If the model invents a route, fall back to a default.</li>
-<li>The parallel version finishes in about the time of the slowest agent, not the sum.</li>
+<li>The concurrent version finishes in about the time of the slowest agent, not the sum. Run both and show the clock.</li>
+<li><code>AgentResponseUpdateEvent.ExecutorId</code> tells you which agent is speaking. Print it live and the whole orchestration stops being a black box, which is the same teaching trick as the <code>ACT</code> and <code>OBSERVE</code> lines in 0.7.</li>
+<li>Agent Framework also ships handoff, group chat, and Magentic-style (planner with ledger) builders, plus a general <code>WorkflowBuilder</code> for custom graphs with cycles, checkpointing, and human-in-the-loop request ports. Mention them, demo sequential and concurrent, and leave the rest for a second course.</li>
 </ol>
 <h2>5.7 Giving each agent its own tools</h2>
 <p>In real systems each specialist also owns tools. Example: a &quot;Billing Agent&quot; has <code>lookup_invoice</code> and <code>issue_credit</code>, while a &quot;Tech Agent&quot; has <code>search_logs</code> and <code>restart_service</code>. The router never gets those dangerous tools. Least privilege applies to agents just as it does to people.</p>
@@ -1852,14 +2010,14 @@ foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we
 </thead>
 <tbody>
 <tr>
-<td><strong>Microsoft.Extensions.AI</strong></td>
-<td>C#</td>
-<td>Provider-neutral abstractions (<code>IChatClient</code>, <code>IEmbeddingGenerator</code>). The base layer used in this guide.</td>
+<td><strong>Microsoft Agent Framework</strong></td>
+<td>C#, Python, Go</td>
+<td>Open-source agent and orchestration framework from Microsoft that succeeds Semantic Kernel and AutoGen. <strong>The framework used for all C# code in this guide.</strong> Core types: <code>AIAgent</code>, <code>AgentSession</code>, <code>AgentResponse</code>, and the workflow builders. Supports sequential, concurrent, handoff, group chat, and Magentic-style orchestration, plus MCP and A2A.</td>
 </tr>
 <tr>
-<td><strong>Microsoft Agent Framework</strong></td>
-<td>C# and Python</td>
-<td>Open-source agent and orchestration framework from Microsoft that succeeds Semantic Kernel and AutoGen. Reported at 1.0 GA on April 3, 2026, with the same concepts in both languages. Supports sequential, concurrent, handoff, group chat, and Magentic-style orchestration, plus MCP and A2A.</td>
+<td><strong>Microsoft.Extensions.AI</strong></td>
+<td>C#</td>
+<td>The provider-neutral layer underneath (<code>IChatClient</code>, <code>IEmbeddingGenerator</code>, <code>AIFunctionFactory</code>, <code>ChatMessage</code>). Agent Framework depends on it, so it is always in your project, but you rarely call it directly once you are working at the agent level.</td>
 </tr>
 <tr>
 <td><strong>Semantic Kernel / AutoGen</strong></td>
@@ -1889,7 +2047,7 @@ foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we
 </tbody>
 </table>
 </div>
-<p><strong>Choosing for a class:</strong> teach the hand-written loop first (Examples 3 and 5 to 7), then show how Agent Framework expresses the same thing with less code. For a .NET-heavy audience, Agent Framework plus Microsoft.Extensions.AI is the natural path. Verify the current package names and method signatures in the official docs before the session, because they moved during the preview period.</p>
+<p><strong>Choosing for a class:</strong> teach the hand-written Python loop first (Examples 3 and 5 to 7), then show the C# Agent Framework version of the same thing. The order matters. If students see <code>AsAIAgent(...)</code> before they have written a loop by hand, the framework looks like magic instead of like a shortcut. Verify the current package names and method signatures in the official docs before the session, because this API moved during the preview period and is still moving.</p>
 <p><strong>Conceptual mapping of the framework to what you already taught:</strong></p>
 <div class="md-table" role="region" aria-label="Table" tabindex="0"><table>
 <thead>
@@ -1901,27 +2059,35 @@ foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we
 <tbody>
 <tr>
 <td>Agent (prompt plus model plus tools)</td>
-<td>An agent object created from a chat client</td>
+<td><code>AIAgent</code>, from <code>chatClient.AsAIAgent(instructions:, tools:)</code></td>
+</tr>
+<tr>
+<td>System prompt</td>
+<td>The agent's <code>instructions</code>, set once at creation</td>
 </tr>
 <tr>
 <td>Tool functions</td>
-<td>Function tools (typed, auto-described) or MCP tools</td>
+<td><code>AIFunctionFactory.Create(method)</code>, or MCP tools</td>
 </tr>
 <tr>
 <td>The loop</td>
-<td>Built into the agent run</td>
+<td>Built into <code>RunAsync</code>; capped with <code>MaximumIterationsPerRequest</code></td>
 </tr>
 <tr>
 <td>Conversation history</td>
-<td>A thread or session object</td>
+<td><code>AgentSession</code>, serializable so you can store and resume it</td>
+</tr>
+<tr>
+<td>Human approval before an action</td>
+<td><code>ApprovalRequiredAIFunction</code> and <code>RequestInfoEvent</code></td>
 </tr>
 <tr>
 <td>Sequential, parallel, router patterns</td>
-<td>Workflow or orchestration builders</td>
+<td><code>AgentWorkflowBuilder</code> in <code>Microsoft.Agents.AI.Workflows</code></td>
 </tr>
 <tr>
 <td>Idempotency and retry state</td>
-<td>Checkpointing and durable execution</td>
+<td>Workflow checkpointing and durable execution</td>
 </tr>
 </tbody>
 </table>
@@ -1972,7 +2138,7 @@ foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we
 </div>
 <p>Run the set after every prompt, model, or chunking change. LLM-as-judge scoring is common, but spot-check it with human review.</p>
 <h2>8.3 Observability</h2>
-<p>Log for every run: input, each model call, each tool call with arguments and results, final output, tokens, latency, and cost. Use OpenTelemetry. In .NET, Microsoft.Extensions.AI includes <code>UseOpenTelemetry()</code> on the client builder. Send traces to your existing platform (for example Application Insights or an Elastic stack) so agent runs show up beside normal service telemetry.</p>
+<p>Log for every run: input, each model call, each tool call with arguments and results, final output, tokens, latency, and cost. Use OpenTelemetry. Agent Framework emits OpenTelemetry spans for agent runs and tool invocations following the GenAI semantic conventions, so you wire it up the same way as the rest of your .NET telemetry and send it to your existing platform (Application Insights, an Elastic stack, or anything else that speaks OTLP). Check the current observability docs for the exact registration call, because that surface has changed more than once. The payoff is that an agent run shows up as a normal distributed trace beside your service calls, with the tool calls as child spans, which is exactly what you want at 3 AM.</p>
 <h2>8.4 Cost and performance</h2>
 <ol>
 <li>Use smaller models for simple steps (classification, routing) and stronger ones for reasoning.</li>
@@ -2192,7 +2358,8 @@ foreach (var (name, text) in await ParallelReview(&#34;Users upload files and we
 <ol>
 <li>Run every example once on your own machine the day before. Model names, quotas, and package versions change.</li>
 <li>Keep demo data fictional. Do not paste real client, member, or patient information into any example.</li>
-<li>If you want, the next step could be a slide deck version of this material, a lab workbook with starter projects for each example, or a Microsoft Agent Framework section once you have chosen the exact package versions for class.</li>
+<li>The C# code targets Microsoft Agent Framework (<code>Microsoft.Agents.AI</code>), checked against the Microsoft Learn docs in October 2026. Pin exact package versions in the lab project and compile every snippet once before class. This API has renamed things more than once (<code>CreateAIAgent</code> to <code>AsAIAgent</code>, <code>AgentThread</code> to <code>AgentSession</code>), and a snippet that does not compile in front of a room costs you ten minutes.</li>
+<li>If you want, the next step could be a slide deck version of this material, or a lab workbook with a pre-built starter solution per example so students are not fighting NuGet during the session.</li>
 </ol>
 
 </body></html>
